@@ -108,6 +108,22 @@ json_get_string() {
   fi
 }
 
+# True if dotted-numeric version <a> is strictly greater than <b> (e.g. 1.2.0 > 1.1.9).
+version_gt() { # <a> <b>
+  [ "$1" = "$2" ] && return 1
+  local hi
+  hi=$(printf '%s\n%s\n' "$1" "$2" | sort -t. -k1,1n -k2,2n -k3,3n | tail -n1)
+  [ "$hi" = "$1" ]
+}
+
+# Highest claude-profiles release version tagged on <repo> (empty if none).
+# Reads `claude-profiles--vX.Y.Z` tags, the form `claude plugin tag` creates.
+latest_release_version() { # <repo>
+  git ls-remote --tags "$1" 'claude-profiles--v*' 2>/dev/null \
+    | sed -n 's#.*refs/tags/claude-profiles--v\([0-9][0-9.]*\)$#\1#p' \
+    | sort -t. -k1,1n -k2,2n -k3,3n | tail -n1
+}
+
 # --- default-source accessors (single-source behavior; schema supports many) ---
 
 _pcfg_read_repo() {

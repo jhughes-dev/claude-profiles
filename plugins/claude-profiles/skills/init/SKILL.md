@@ -63,17 +63,22 @@ The repo URL is `file://<path>`.
 
 `bash "${CLAUDE_PLUGIN_ROOT}/scripts/write-config.sh" <repo-url>`
 
-## 4. Offer to capture the current `~/.claude` as the `user` branch
+## 4. Offer to capture the current `~/.claude` as the user-profile branch
 
 If `~/.claude/.git` does not exist, ask:
 
-> Capture your existing ~/.claude config as the `user` branch on your profiles
+> Capture your existing ~/.claude config as your user profile on your profiles
 > repo? This is reversible — your live files won't be overwritten.
 
-If yes: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/capture-user-branch.sh"`. The
-script handles `git init`, remote setup, ignore rules for runtime state,
-removing embedded plugin gitlinks, and the initial push. Surface its output
-to the user.
+If yes, also ask which **branch name** to use for the user profile (default
+`user`; any name works — e.g. `main` if you'd rather it be the repo's default
+branch). Then run, passing the chosen branch:
+
+`bash "${CLAUDE_PLUGIN_ROOT}/scripts/capture-user-branch.sh" <branch>`
+
+The script persists the branch choice to the global config, then handles
+`git init`, remote setup, ignore rules for runtime state, removing embedded
+plugin gitlinks, and the initial push. Surface its output to the user.
 
 If no: tell them they can run `/claude-profiles:set` later in any workspace.
 
@@ -83,7 +88,7 @@ Print:
 
 - **Profiles repo**: `<url>`
 - **Config file**: `~/.config/claude-profiles/config.json`
-- **Captured `~/.claude` as `user` branch**: yes/no
+- **Captured `~/.claude` as user profile**: yes/no (branch name if yes)
 
 Next steps:
 

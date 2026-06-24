@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
-# Convert ~/.claude into a git working tree on the `user` branch of the
+# Convert ~/.claude into a git working tree on the user-profile branch of the
 # configured profiles repo, without disturbing the live files.
 #
-# Usage: capture-user-branch.sh
+# Usage: capture-user-branch.sh [branch]
+#   [branch] is the user-profile branch name. Any name is allowed (e.g. 'user'
+#   or 'main'). When given, it is persisted to the global config; otherwise the
+#   stored preference is used, defaulting to 'user'.
 #
 # Steps:
-#  1. `git init -b user` if not already a git repo.
+#  1. `git init -b <branch>` if not already a git repo.
 #  2. Add the configured profiles repo as `origin`.
-#  3. Fetch; if `origin/user` exists, soft-reset HEAD onto it (so already-pushed
-#     content shows as untracked rather than as a giant diff).
+#  3. Fetch; if `origin/<branch>` exists, soft-reset HEAD onto it (so already-
+#     pushed content shows as untracked rather than as a giant diff).
 #  4. Apply the standard ignore set so runtime state doesn't get staged.
 #  5. Stage everything not ignored, commit, and push -u.
 set -uo pipefail
@@ -24,15 +27,23 @@ if [ -z "$repo" ]; then
 fi
 [ -d "$dir" ] || { echo "$dir does not exist" >&2; exit 1; }
 
+# Resolve the user-profile branch: explicit arg (persisted) > stored pref > 'user'.
+branch="${1:-}"
+if [ -n "$branch" ]; then
+  pcfg_set_pref userBranch "$branch"
+else
+  branch=$(pcfg_get_pref userBranch); [ -n "$branch" ] || branch=user
+fi
+
 # 1) Init + branch.
 if [ ! -d "$dir/.git" ]; then
-  git -C "$dir" init -b user >/dev/null
+  git -C "$dir" init -b "$branch" >/dev/null
 fi
 current=$(git -C "$dir" branch --show-current 2>/dev/null)
 if [ -z "$current" ]; then
-  git -C "$dir" checkout -b user
-elif [ "$current" != "user" ]; then
-  echo "$dir is on branch '$current' — refusing to overwrite. Switch to 'user' manually if appropriate." >&2
+  git -C "$dir" checkout -b "$branch"
+elif [ "$current" != "$branch" ]; then
+  echo "$dir is on branch '$current' — refusing to overwrite. Switch to '$branch' manually if appropriate." >&2
   exit 1
 fi
 
@@ -41,10 +52,10 @@ if ! git -C "$dir" remote get-url origin >/dev/null 2>&1; then
   git -C "$dir" remote add origin "$repo"
 fi
 
-# 3) Align with origin/user if it already exists.
+# 3) Align with origin/<branch> if it already exists.
 git -C "$dir" fetch -q origin 2>/dev/null || true
-if git -C "$dir" rev-parse --verify -q origin/user >/dev/null 2>&1; then
-  git -C "$dir" reset --soft origin/user 2>/dev/null || git -C "$dir" reset origin/user
+if git -C "$dir" rev-parse --verify -q "origin/$branch" >/dev/null 2>&1; then
+  git -C "$dir" reset --soft "origin/$branch" 2>/dev/null || git -C "$dir" reset "origin/$branch"
 fi
 
 # 4) Standard ignore set — runtime state, plugin caches, embedded plugin clones.
@@ -90,8 +101,8 @@ git -C "$dir" ls-files --stage 2>/dev/null \
     done
 
 if git -C "$dir" diff --cached --quiet 2>/dev/null; then
-  echo "nothing to commit (already in sync with origin/user)"
+  echo "nothing to commit (already in sync with origin/$branch)"
   exit 0
 fi
 git -C "$dir" commit -m "Capture ~/.claude as user profile"
-git -C "$dir" push -u origin user
+git -C "$dir" push -u origin "$branch"

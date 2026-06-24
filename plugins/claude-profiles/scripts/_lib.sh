@@ -135,7 +135,7 @@ latest_release_version() { # <repo>
 # reads the writer's own format (one source key per line, one profile per line).
 
 # Known preference keys (for the no-jq dump, which can't enumerate object keys).
-PCFG_PREF_KEYS="promoteMode"
+PCFG_PREF_KEYS="promoteMode userBranch"
 
 # Flatten config.json to the K/S/P dump format above.
 pcfg_dump() {

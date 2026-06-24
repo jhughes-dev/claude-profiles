@@ -26,6 +26,10 @@
           "type": "string",
           "enum": ["copy", "move", "ask"],
           "description": "When /claude-profiles:configure promotes skills/agents/commands/hooks from user space into a profile: copy (keep in ~/.claude), move (remove from ~/.claude), or ask each time. Default: ask."
+        },
+        "userBranch": {
+          "type": "string",
+          "description": "Branch on the default source that holds the user's personal ~/.claude profile. Any branch name is allowed (e.g. 'user' or 'main'). Default: 'user'."
         }
       }
     }

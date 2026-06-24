@@ -1,6 +1,6 @@
 {
   "name": "claude-profiles",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Manage per-workspace .claude profiles backed by a git repo of profile branches.",
   "author": {
     "name": "jhughes"

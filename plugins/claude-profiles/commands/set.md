@@ -5,11 +5,24 @@ argument-hint: "[branch | --new <branch> [--from <a>,<b>,...] | --adopt <branch>
 
 Configure this workspace's `.claude` folder from the user's profiles repo.
 
-The profiles repo URL comes from the JSON config at
-`~/.config/claude-profiles/config.json` (the default source's `repo`). If no
-profiles repo is configured, tell the user to run `/claude-profiles:init` first
-and stop. The bundled scripts under `${CLAUDE_PLUGIN_ROOT}/scripts/` read this
-same config; you don't need to pass the URL around explicitly.
+Profiles come from one or more **sources** in `~/.config/claude-profiles/config.json`
+(manage them with `/claude-profiles:source`). If no source is configured, tell
+the user to run `/claude-profiles:init` first and stop. The bundled scripts
+under `${CLAUDE_PLUGIN_ROOT}/scripts/` read this config; you don't need to pass
+URLs around explicitly.
+
+**Source resolution.** When the user names an existing branch, find which
+source provides it by running
+`bash "${CLAUDE_PLUGIN_ROOT}/scripts/list-branches.sh" --by-source` (it prints
+`<source>\t<branch>` lines):
+
+- Exactly one source has the branch → use it.
+- Several sources have a branch of that name → **ask the user which source**.
+- None list it → fall back to the default source (the branch may be new/uncached).
+
+Then export `CLAUDE_PROFILES_SOURCE=<source>` for the clone/adopt/marker scripts
+below — they operate on that source's repo and record it in the marker. With a
+single source you can skip this; everything defaults to it.
 
 Arguments given: "$ARGUMENTS"
 
@@ -37,11 +50,15 @@ folder (if any) and continue. The marker will be rewritten in step 5.
     its current branch (`git -C .claude branch --show-current`) and stop.
   - **No `.claude`** → offer existing / new-from-template / opt-out.
 
-  To list available branches, run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/list-branches.sh"`.
+  To list available branches, run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/list-branches.sh"`
+  (or `--by-source` to see which source each branch comes from).
 
 ## 3. Execute the chosen mode
 
 ### 3a. Existing branch
+
+Resolve the source first (see **Source resolution** above) and export
+`CLAUDE_PROFILES_SOURCE` if more than one source exists. Then:
 
 `bash "${CLAUDE_PLUGIN_ROOT}/scripts/clone-profile.sh" <branch>`
 

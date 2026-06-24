@@ -92,6 +92,30 @@ make_fake_profiles_repo() {
   normalize_path "$bare"
 }
 
+# Make a bare repo named <name> with main, template, and the given extra
+# branches. Echoes the repo path. Use for multi-source tests.
+make_repo_with_branches() { # <name> <extra-branch>...
+  local name="$1"; shift
+  local bare="$TEST_TMP/$name.git"
+  git init --bare -q -b main "$bare"
+  local seed="$TEST_TMP/seed-$name"
+  git init -q -b main "$seed"
+  (
+    cd "$seed"
+    git config user.email t@t
+    git config user.name t
+    echo "$name" > README.md
+    git add README.md
+    git commit -q -m init
+    git branch template
+    local b
+    for b in "$@"; do git branch "$b"; done
+    git push -q "$bare" main template "$@"
+  )
+  rm -rf "$seed"
+  normalize_path "$bare"
+}
+
 # Write a minimal profiles config pointing at the given repo (current format).
 write_config() {
   pcfg_set_repo "$1"

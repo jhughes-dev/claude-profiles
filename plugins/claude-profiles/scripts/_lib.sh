@@ -126,25 +126,34 @@ latest_release_version() { # <repo>
 
 # --- multi-source config (issue #1) ---
 #
-# The config holds an array of sources, each a profiles repo. Pure-bash I/O goes
-# through a flat "dump" intermediate so we can manipulate the array without jq:
+# The config holds an array of sources plus a preferences object. Pure-bash I/O
+# goes through a flat "dump" intermediate so we can manipulate it without jq:
+#   K<TAB>key<TAB>value                  (one per preferences entry)
 #   S<TAB>name<TAB>repo<TAB>default      (one per source)
 #   P<TAB>name<TAB>branch<TAB>desc       (one cached profile, under its source)
 # jq is used for the dump/parse when present; otherwise a layout-aware awk parser
 # reads the writer's own format (one source key per line, one profile per line).
 
-# Flatten config.json to the S/P dump format above.
+# Known preference keys (for the no-jq dump, which can't enumerate object keys).
+PCFG_PREF_KEYS="promoteMode"
+
+# Flatten config.json to the K/S/P dump format above.
 pcfg_dump() {
   local file; file="$(pcfg_file)"
   [ -f "$file" ] || return 0
   if command -v jq >/dev/null 2>&1; then
     jq -r '
-      .sources[]? |
-      ( "S\t" + .name + "\t" + (.repo // "") + "\t" + ((.default // false) | tostring) ),
-      ( .name as $n | (.profiles[]? | "P\t" + $n + "\t" + .branch + "\t" + (.description // "")) )
+      ( (.preferences // {}) | to_entries[] | "K\t" + .key + "\t" + (.value | tostring) ),
+      ( .sources[]? |
+        ( "S\t" + .name + "\t" + (.repo // "") + "\t" + ((.default // false) | tostring) ),
+        ( .name as $n | (.profiles[]? | "P\t" + $n + "\t" + .branch + "\t" + (.description // "")) ) )
     ' "$file" 2>/dev/null
     return
   fi
+  local _k _v
+  for _k in $PCFG_PREF_KEYS; do
+    _v=$(_json_scan "$file" "$_k"); [ -n "$_v" ] && printf 'K\t%s\t%s\n' "$_k" "$_v"
+  done
   awk '
     function unescape(s,   r, i, c, n) {
       r = ""; n = length(s)
@@ -197,10 +206,18 @@ _pcfg_write_from_dump() {
   local file dir tmp; file="$(pcfg_file)"; dir="$(pcfg_dir)"; mkdir -p "$dir"; tmp="$file.tmp.$$"
   awk -F'\t' -v schema="$PCFG_SCHEMA_URL" '
     function esc(s) { gsub(/\\/, "\\\\", s); gsub(/"/, "\\\"", s); return s }
+    $1 == "K" { if (!(($2) in seenk)) { seenk[$2] = 1; nk++; kk[nk] = $2; kv[$2] = $3 } }
     $1 == "S" { ns++; sn[ns] = $2; sr[ns] = $3; sd[ns] = ($4 == "true" ? "true" : "false"); idx[$2] = ns }
     $1 == "P" { k = idx[$2]; if (k) { pc[k]++; pb[k, pc[k]] = $3; pd[k, pc[k]] = $4 } }
     END {
-      printf "{\n  \"$schema\": \"%s\",\n  \"version\": 1,\n  \"sources\": [", schema
+      printf "{\n  \"$schema\": \"%s\",\n  \"version\": 1,\n", schema
+      if (nk > 0) {
+        printf "  \"preferences\": {\n"
+        for (i = 1; i <= nk; i++)
+          printf "    \"%s\": \"%s\"%s\n", esc(kk[i]), esc(kv[kk[i]]), (i < nk ? "," : "")
+        printf "  },\n"
+      }
+      printf "  \"sources\": ["
       if (ns == 0) { printf "]\n}\n"; exit }
       printf "\n"
       for (s = 1; s <= ns; s++) {
@@ -306,6 +323,24 @@ pcfg_set_default_source() { # <name>
   pcfg_migrate
   pcfg_dump | awk -F'\t' -v n="$1" 'BEGIN { OFS = "\t" } $1 == "S" { $4 = ($2 == n ? "true" : "false") } { print }' \
     | _pcfg_write_from_dump
+}
+
+# --- preferences ---
+
+# Read a preference value (empty if unset).
+pcfg_get_pref() { # <key>
+  pcfg_migrate
+  pcfg_dump | awk -F'\t' -v k="$1" '$1 == "K" && $2 == k { print $3; exit }'
+}
+
+# Set a preference value (replacing any existing entry for the key).
+pcfg_set_pref() { # <key> <value>
+  pcfg_migrate
+  pcfg_dump | awk -F'\t' -v k="$1" -v v="$2" '
+    BEGIN { OFS = "\t" }
+    $1 == "K" && $2 == k { next }
+    { print }
+    END { print "K", k, v }' | _pcfg_write_from_dump
 }
 
 # --- back-compat single-(default-)source helpers ---

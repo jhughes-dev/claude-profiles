@@ -52,6 +52,7 @@ Once `/claude-profiles:init` is done, in any workspace:
 /claude-profiles:set --none           # mark workspace as no-profile
 /claude-profiles:status               # show sync status of this workspace's profile
 /claude-profiles:update               # pull + push this workspace's profile (resolve conflicts)
+/claude-profiles:configure            # promote user-space config (plugins/skills/settings) into this profile
 /claude-profiles:source list          # list profile sources
 /claude-profiles:source add work git@host:team/profiles.git   # draw profiles from another repo
 ```

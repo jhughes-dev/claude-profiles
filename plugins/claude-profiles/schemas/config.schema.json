@@ -16,6 +16,18 @@
       "type": "array",
       "description": "Profile sources. Each is a git repo whose branches are profiles. (Issue #1: multiple sources.)",
       "items": { "$ref": "#/$defs/source" }
+    },
+    "preferences": {
+      "type": "object",
+      "description": "User preferences for plugin behavior.",
+      "additionalProperties": false,
+      "properties": {
+        "promoteMode": {
+          "type": "string",
+          "enum": ["copy", "move", "ask"],
+          "description": "When /claude-profiles:configure promotes skills/agents/commands/hooks from user space into a profile: copy (keep in ~/.claude), move (remove from ~/.claude), or ask each time. Default: ask."
+        }
+      }
     }
   },
   "$defs": {

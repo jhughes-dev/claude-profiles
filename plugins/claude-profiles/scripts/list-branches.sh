@@ -1,19 +1,18 @@
 #!/usr/bin/env bash
 # List profile branches on the configured profiles repo, one per line.
-# Excludes 'template'. Reads the repo URL from ~/.claude-profiles-config.
+# Excludes 'template'. Reads the repo URL from the claude-profiles config.
 # Usage: list-branches.sh
 # Exits non-zero with an error message on stderr if no repo is configured
 # or the remote is unreachable.
 set -uo pipefail
 
-config="$HOME/.claude-profiles-config"
-if [ ! -f "$config" ]; then
-  echo "no claude-profiles config — run /claude-profiles:init" >&2
-  exit 1
-fi
-repo=$(sed -n 's/^repo=//p' "$config" | head -n1)
+here="$(dirname "$0")"
+# shellcheck source=_lib.sh
+. "$here/_lib.sh"
+
+repo=$(pcfg_default_repo)
 if [ -z "$repo" ]; then
-  echo "no repo= line in $config — run /claude-profiles:init" >&2
+  echo "no profiles repo configured — run /claude-profiles:init" >&2
   exit 1
 fi
 

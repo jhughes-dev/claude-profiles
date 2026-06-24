@@ -1,21 +1,22 @@
 #!/usr/bin/env bash
-# Write the .claude-profiles marker file at the workspace root.
+# Write the .claude-profiles marker file (JSON) at the workspace root.
 # Usage: write-marker.sh <profile> [workspace-dir]
-#   <profile> may be 'none' to record opt-out (omits repo=).
+#   <profile> may be 'none' to record opt-out (omits repo/source).
 set -uo pipefail
+
+here="$(dirname "$0")"
+# shellcheck source=_lib.sh
+. "$here/_lib.sh"
 
 profile="${1:?usage: write-marker.sh <profile> [workspace-dir]}"
 workspace="${2:-${CLAUDE_PROJECT_DIR:-$PWD}}"
-marker="$workspace/.claude-profiles"
 
-config="$HOME/.claude-profiles-config"
-repo=$(sed -n 's/^repo=//p' "$config" 2>/dev/null | head -n1)
+repo=""
+source=""
+if [ "$profile" != "none" ]; then
+  repo=$(pcfg_default_repo)
+  source=$(pcfg_default_source_name)
+fi
 
-{
-  printf 'profile=%s\n' "$profile"
-  if [ "$profile" != "none" ] && [ -n "$repo" ]; then
-    printf 'repo=%s\n' "$repo"
-  fi
-} > "$marker"
-
-echo "wrote $marker"
+write_marker_json "$workspace" "$profile" "$repo" "$source"
+echo "wrote $(marker_path "$workspace")"

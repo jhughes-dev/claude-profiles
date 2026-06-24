@@ -7,8 +7,9 @@ test_setup; trap test_teardown EXIT
 out=$(run_script check-config.sh)
 assert_kv "$out" state missing "missing state" || exit 1
 
-# Empty config → state=no_repo
-: > "$HOME/.claude-profiles-config"
+# Config present but no source/repo → state=no_repo
+mkdir -p "$(pcfg_dir)"
+printf '{}\n' > "$(pcfg_file)"
 out=$(run_script check-config.sh)
 assert_kv "$out" state no_repo "no_repo state" || exit 1
 

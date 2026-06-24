@@ -4,11 +4,17 @@
 # PLUGIN_ROOT is set by run.sh.
 : "${PLUGIN_ROOT:?PLUGIN_ROOT not set — run via tests/run.sh}"
 
+# shellcheck source=../scripts/_lib.sh
+. "$PLUGIN_ROOT/scripts/_lib.sh"
+
 # Set up a clean throwaway HOME and workspace for each test, so that ~/.claude*
 # files written by scripts/hooks don't leak into the real home dir.
 test_setup() {
   TEST_TMP=$(mktemp -d)
   export HOME="$TEST_TMP/home"
+  # Isolate the XDG config dir to the throwaway HOME so the JSON config lands
+  # under it (and never touches the real ~/.config).
+  unset XDG_CONFIG_HOME
   mkdir -p "$HOME"
   # Give the throwaway HOME a global git identity, so repos created by the
   # scripts under test (e.g. the .claude clones) can commit. Mirrors a real
@@ -86,8 +92,16 @@ make_fake_profiles_repo() {
   normalize_path "$bare"
 }
 
-# Write a minimal ~/.claude-profiles-config pointing at the given repo.
+# Write a minimal profiles config pointing at the given repo (current format).
 write_config() {
-  local repo="$1"
-  printf 'repo=%s\n' "$repo" > "$HOME/.claude-profiles-config"
+  pcfg_set_repo "$1"
+}
+
+# Write a legacy (pre-1.x) key=value global config, for migration tests.
+write_legacy_config() {
+  local repo="$1" branches="${2:-}"
+  {
+    printf 'repo=%s\n' "$repo"
+    [ -n "$branches" ] && printf 'branches=%s\n' "$branches"
+  } > "$HOME/.claude-profiles-config"
 }

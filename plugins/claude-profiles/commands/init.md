@@ -80,7 +80,7 @@ If no: tell them they can run `/claude-profiles:set` later in any workspace.
 Print:
 
 - **Profiles repo**: `<url>`
-- **Config file**: `~/.claude-profiles-config`
+- **Config file**: `~/.config/claude-profiles/config.json`
 - **Captured `~/.claude` as `user` branch**: yes/no
 
 Next steps:

@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/jhughes-dev/claude-profiles/blob/main/plugins/claude-profiles/schemas/config.schema.json",
+  "title": "claude-profiles global config",
+  "description": "User-level config for the claude-profiles plugin. Located at $XDG_CONFIG_HOME/claude-profiles/config.json (default ~/.config/claude-profiles/config.json).",
+  "type": "object",
+  "required": ["version", "sources"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": {
+      "const": 1,
+      "description": "Config schema version. Bumped on breaking format changes."
+    },
+    "sources": {
+      "type": "array",
+      "description": "Profile sources. Each is a git repo whose branches are profiles. (Issue #1: multiple sources.)",
+      "items": { "$ref": "#/$defs/source" }
+    }
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "required": ["name", "repo"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Stable identifier for this source, referenced by a workspace marker's `source` field.",
+          "pattern": "^[A-Za-z0-9._-]+$"
+        },
+        "repo": {
+          "type": "string",
+          "description": "Git URL or local path of the profiles repo."
+        },
+        "default": {
+          "type": "boolean",
+          "description": "Marks the default source used when none is specified. At most one source should set this true.",
+          "default": false
+        },
+        "profiles": {
+          "type": "array",
+          "description": "Locally cached list of profile branches on this source, with optional descriptions. (Issue #3.)",
+          "items": { "$ref": "#/$defs/profile" }
+        }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "required": ["branch"],
+      "additionalProperties": false,
+      "properties": {
+        "branch": {
+          "type": "string",
+          "description": "Branch name on the source repo."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable summary of what this profile is for, shown when picking a profile."
+        }
+      }
+    }
+  }
+}

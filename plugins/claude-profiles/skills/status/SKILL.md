@@ -1,5 +1,7 @@
 ---
+name: status
 description: Check this workspace's .claude profile sync status against the claude-profiles repo
+when_to_use: When the user asks whether their profile is in sync, up to date, or has unpushed/uncommitted profile changes, or asks about the state of this workspace's .claude profile.
 ---
 
 Check the sync status of this workspace's `.claude` profile.

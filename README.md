@@ -26,8 +26,10 @@ Then run `/claude-profiles:init` to configure your profiles repo. The wizard han
 - Creating **a new remote** (uses `gh`/`glab` if available).
 - Initializing a **new local** bare repo.
 
-It will also offer to capture your current `~/.claude` config as a `user` branch
-on your new profiles repo (without overwriting any live files).
+It will also offer to capture your current `~/.claude` config as your user
+profile on your new profiles repo (without overwriting any live files). The
+user-profile branch name is your choice — `user` by default, or any name (e.g.
+`main`); it's recorded in the global config.
 
 ## Your profiles repo
 
@@ -37,7 +39,7 @@ this plugin repo — it holds your profiles, one per branch:
 | Branch | Role |
 | --- | --- |
 | `template` | Starting content for new profile branches. `/claude-profiles:set --new` clones from here. |
-| `user` | Your personal `~/.claude` config, captured during `init`. |
+| `user` | Your personal `~/.claude` config, captured during `init`. The branch name is configurable (default `user`; can be any branch, e.g. `main`). |
 | Scenario branches | One per development context (rust-cli, web-development, etc.). |
 
 ## Workspace commands

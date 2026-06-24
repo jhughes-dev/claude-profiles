@@ -1,0 +1,14 @@
+{
+  "name": "claude-profiles",
+  "owner": {
+    "name": "jhughes"
+  },
+  "plugins": [
+    {
+      "name": "claude-profiles",
+      "source": "./plugins/claude-profiles",
+      "description": "Manage per-workspace .claude profiles backed by a git repo of profile branches.",
+      "version": "1.0.0"
+    }
+  ]
+}

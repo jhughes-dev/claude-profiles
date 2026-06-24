@@ -1,0 +1,33 @@
+{
+  "name": "claude-profiles",
+  "version": "1.0.0",
+  "description": "Manage per-workspace .claude profiles backed by a git repo of profile branches.",
+  "author": {
+    "name": "jhughes"
+  },
+  "repository": "git@github.com:jhughes-dev/claude-profiles.git",
+  "keywords": ["profiles", "workspace", "git", "configuration"],
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh\""
+          }
+        ]
+      }
+    ],
+    "ConfigChange": [
+      {
+        "matcher": "user_settings|project_settings|local_settings|skills",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/config-change.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}

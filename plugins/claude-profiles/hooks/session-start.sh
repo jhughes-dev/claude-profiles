@@ -28,6 +28,10 @@ emit() { # $1 = user-visible message, $2 = context for Claude
     msg="$msg (New profile branches available: $NEW_BRANCHES)"
     ctx="$ctx [claude-profiles] New profile branches detected on \$CLAUDE_PROFILES_REPO since the last session: $NEW_BRANCHES. Mention these to the user as options for /claude-profiles:set."
   fi
+  if [ -n "${PLUGIN_UPDATE:-}" ]; then
+    msg="$msg (claude-profiles $PLUGIN_UPDATE is available — update via /plugin)"
+    ctx="$ctx [claude-profiles] A newer claude-profiles plugin release ($PLUGIN_UPDATE) is available; the installed version is ${PLUGIN_CURRENT:-unknown}. Suggest the user update it from the /plugin menu (or 'claude plugin update claude-profiles')."
+  fi
   hook_emit_json SessionStart "$msg" "$ctx"
 }
 
@@ -62,6 +66,26 @@ check_new_branches() {
 }
 check_new_branches
 
+# Detect a newer plugin release on the plugin repo (vs the installed version).
+# Cheap rate limit: once per day per machine.
+PLUGIN_UPDATE=""
+PLUGIN_CURRENT=""
+check_plugin_update() {
+  local manifest="$here/../.claude-plugin/plugin.json"
+  [ -f "$manifest" ] || return 0
+  PLUGIN_CURRENT=$(json_get_string "$manifest" version)
+  local repo; repo=$(json_get_string "$manifest" repository)
+  [ -n "$PLUGIN_CURRENT" ] && [ -n "$repo" ] || return 0
+  local stamp="$HOME/.claude-profiles-version-stamp"
+  [ -n "$(find "$stamp" -mtime -1 2>/dev/null)" ] && return 0
+  local latest
+  latest=$(latest_release_version "$repo")
+  touch "$stamp"
+  [ -n "$latest" ] || return 0
+  version_gt "$latest" "$PLUGIN_CURRENT" && PLUGIN_UPDATE="$latest"
+}
+check_plugin_update
+
 # 1) No marker — workspace hasn't been classified yet.
 if [ -z "$profile" ]; then
   if [ -z "$profiles_repo" ]; then
@@ -79,9 +103,9 @@ if [ -z "$profile" ]; then
   exit 0
 fi
 
-# 2) Opted out — silent (only nag about new branches if any).
+# 2) Opted out — silent (only speak up about new branches or a plugin update).
 if [ "$profile" = "none" ]; then
-  [ -n "$NEW_BRANCHES" ] && emit "" ""
+  [ -n "$NEW_BRANCHES$PLUGIN_UPDATE" ] && emit "" ""
   exit 0
 fi
 
@@ -115,8 +139,8 @@ case "$state" in
              "[claude-profiles] The .claude profile in this workspace is behind its remote branch. A newer version of this profile is available. Suggest the user run /claude-profiles:update to pull the latest changes."
         ;;
       clean)
-        # In sync; only emit if there are new branches to advertise.
-        [ -n "$NEW_BRANCHES" ] && emit "" ""
+        # In sync; only emit if there are new branches or a plugin update.
+        [ -n "$NEW_BRANCHES$PLUGIN_UPDATE" ] && emit "" ""
         ;;
     esac
     ;;

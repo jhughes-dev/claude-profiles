@@ -14,8 +14,8 @@ workspace="${2:-${CLAUDE_PROJECT_DIR:-$PWD}}"
 repo=""
 source=""
 if [ "$profile" != "none" ]; then
-  repo=$(pcfg_default_repo)
-  source=$(pcfg_default_source_name)
+  source=$(pcfg_active_source)
+  repo=$(pcfg_source_repo "$source")
 fi
 
 write_marker_json "$workspace" "$profile" "$repo" "$source"

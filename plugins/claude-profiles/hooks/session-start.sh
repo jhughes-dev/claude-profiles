@@ -12,7 +12,6 @@ here="$(dirname "$0")"
 workspace="${CLAUDE_PROJECT_DIR:-$PWD}"
 dir="$workspace/.claude"
 marker="$workspace/.claude-profiles"
-config="$HOME/.claude-profiles-config"
 
 # Don't nag inside the global ~/.claude. Also skip a checkout of this plugin's
 # own source repo *only* when the user hasn't classified it yet — once they've
@@ -32,12 +31,8 @@ emit() { # $1 = user-visible message, $2 = context for Claude
   hook_emit_json SessionStart "$msg" "$ctx"
 }
 
-profiles_repo=""
-known_branches=""
-if [ -f "$config" ]; then
-  profiles_repo=$(sed -n 's/^repo=//p' "$config" | head -n1)
-  known_branches=$(sed -n 's/^branches=//p' "$config" | head -n1)
-fi
+profiles_repo=$(pcfg_default_repo)
+known_branches=$(pcfg_branches_csv)
 profile=$(read_marker_profile "$workspace")
 
 # Detect new branches on the profiles repo (vs cached list). Cheap rate limit:
@@ -55,11 +50,7 @@ check_new_branches() {
   [ -n "$remote" ] || return 0
   if [ -z "$known_branches" ]; then
     # First run: just record what's there, don't nag.
-    if grep -q '^branches=' "$config" 2>/dev/null; then
-      sed -i.bak "s|^branches=.*|branches=$remote|" "$config" && rm -f "$config.bak"
-    else
-      printf 'branches=%s\n' "$remote" >> "$config"
-    fi
+    pcfg_set_branches_csv "$remote"
     return 0
   fi
   local new
@@ -67,11 +58,7 @@ check_new_branches() {
                  <(printf '%s\n' "$known_branches" | tr ',' '\n' | sort -u) \
         | paste -sd, -)
   [ -n "$new" ] && NEW_BRANCHES="$new"
-  if grep -q '^branches=' "$config" 2>/dev/null; then
-    sed -i.bak "s|^branches=.*|branches=$remote|" "$config" && rm -f "$config.bak"
-  else
-    printf 'branches=%s\n' "$remote" >> "$config"
-  fi
+  pcfg_set_branches_csv "$remote"
 }
 check_new_branches
 
@@ -79,7 +66,7 @@ check_new_branches
 if [ -z "$profile" ]; then
   if [ -z "$profiles_repo" ]; then
     emit "No Claude profiles repo configured — run /claude-profiles:init to set one up. Profiles let you keep a different ~/.claude per workspace, backed by branches in a single git repo." \
-         "[claude-profiles] ~/.claude-profiles-config is missing or has no repo= line. The user has not yet configured a profiles repo. Profiles are per-workspace .claude folders backed by branches of a single git repo (one branch per scenario: rust-cli, web-dev, etc.). Run /claude-profiles:init to configure one before adopting any workspace into a profile."
+         "[claude-profiles] No profiles repo is configured (~/.config/claude-profiles/config.json is missing or has no source). The user has not yet configured a profiles repo. Profiles are per-workspace .claude folders backed by branches of a single git repo (one branch per scenario: rust-cli, web-dev, etc.). Run /claude-profiles:init to configure one before adopting any workspace into a profile."
     exit 0
   fi
   if [ -d "$dir" ]; then

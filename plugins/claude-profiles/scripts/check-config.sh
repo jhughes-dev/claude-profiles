@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Inspect ~/.claude-profiles-config and report whether the configured repo is
+# Inspect the claude-profiles config and report whether the configured repo is
 # reachable. Used by /claude-profiles:init to short-circuit if already set up.
 #
 # Usage: check-config.sh
@@ -9,18 +9,24 @@
 #   summary=<one-line>
 set -uo pipefail
 
-config="$HOME/.claude-profiles-config"
+here="$(dirname "$0")"
+# shellcheck source=_lib.sh
+. "$here/_lib.sh"
+
 emit() { printf '%s=%s\n' "$1" "$2"; }
 
-if [ ! -f "$config" ]; then
+pcfg_migrate
+file="$(pcfg_file)"
+
+if [ ! -f "$file" ]; then
   emit state missing
-  emit summary "$config does not exist."
+  emit summary "$file does not exist."
   exit 0
 fi
-repo=$(sed -n 's/^repo=//p' "$config" | head -n1)
+repo=$(pcfg_default_repo)
 if [ -z "$repo" ]; then
   emit state no_repo
-  emit summary "$config has no repo= line."
+  emit summary "$file has no profiles source configured."
   exit 0
 fi
 emit repo "$repo"

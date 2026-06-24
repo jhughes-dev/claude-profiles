@@ -21,7 +21,7 @@ dir="$workspace/.claude"
 here="$(dirname "$0")"
 # shellcheck source=_lib.sh
 . "$here/_lib.sh"
-repo=$(pcfg_default_repo)
+repo=$(pcfg_active_repo)
 if [ -z "$repo" ]; then
   echo "no profiles repo configured — run /claude-profiles:init" >&2
   exit 1

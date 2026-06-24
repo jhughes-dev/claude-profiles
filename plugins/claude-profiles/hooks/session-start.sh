@@ -35,34 +35,43 @@ emit() { # $1 = user-visible message, $2 = context for Claude
   hook_emit_json SessionStart "$msg" "$ctx"
 }
 
-profiles_repo=$(pcfg_default_repo)
-known_branches=$(pcfg_branches_csv)
+profiles_configured=""
+[ -n "$(pcfg_sources)" ] && profiles_configured=1
 profile=$(read_marker_profile "$workspace")
 
-# Detect new branches on the profiles repo (vs cached list). Cheap rate limit:
-# once per day per machine.
+# Detect new branches across every source (vs each source's cached list).
+# Cheap rate limit: once per day per machine. New branches are labelled
+# "<source>:<branch>" when more than one source is configured.
 NEW_BRANCHES=""
 check_new_branches() {
-  [ -n "$profiles_repo" ] || return 0
+  [ -n "$profiles_configured" ] || return 0
   local stamp="$HOME/.claude-profiles-branches-stamp"
-  if [ -n "$(find "$stamp" -mtime -1 2>/dev/null)" ]; then
-    return 0
-  fi
-  local remote
-  remote=$(bash "$here/../scripts/list-branches.sh" 2>/dev/null | paste -sd, -)
+  [ -n "$(find "$stamp" -mtime -1 2>/dev/null)" ] && return 0
   touch "$stamp"
-  [ -n "$remote" ] || return 0
-  if [ -z "$known_branches" ]; then
-    # First run: just record what's there, don't nag.
-    pcfg_set_branches_csv "$remote"
-    return 0
-  fi
-  local new
-  new=$(comm -23 <(printf '%s\n' "$remote" | tr ',' '\n' | sort -u) \
-                 <(printf '%s\n' "$known_branches" | tr ',' '\n' | sort -u) \
-        | paste -sd, -)
-  [ -n "$new" ] && NEW_BRANCHES="$new"
-  pcfg_set_branches_csv "$remote"
+  local multi=""; [ "$(pcfg_sources | wc -l)" -gt 1 ] && multi=1
+  local s remote known new b
+  while IFS= read -r s; do
+    [ -n "$s" ] || continue
+    remote=$(bash "$here/../scripts/list-branches.sh" "$s" 2>/dev/null | paste -sd, -)
+    [ -n "$remote" ] || continue
+    known=$(pcfg_source_branches_csv "$s")
+    if [ -z "$known" ]; then
+      pcfg_set_branches_csv "$remote" "$s"   # first run for this source: just record
+      continue
+    fi
+    new=$(comm -23 <(printf '%s\n' "$remote" | tr ',' '\n' | sort -u) \
+                   <(printf '%s\n' "$known"  | tr ',' '\n' | sort -u))
+    while IFS= read -r b; do
+      [ -n "$b" ] || continue
+      [ -n "$multi" ] && b="$s:$b"
+      NEW_BRANCHES="${NEW_BRANCHES:+$NEW_BRANCHES, }$b"
+    done <<INNER
+$new
+INNER
+    pcfg_set_branches_csv "$remote" "$s"
+  done <<OUTER
+$(pcfg_sources)
+OUTER
 }
 check_new_branches
 
@@ -88,7 +97,7 @@ check_plugin_update
 
 # 1) No marker — workspace hasn't been classified yet.
 if [ -z "$profile" ]; then
-  if [ -z "$profiles_repo" ]; then
+  if [ -z "$profiles_configured" ]; then
     emit "No Claude profiles repo configured — run /claude-profiles:init to set one up. Profiles let you keep a different ~/.claude per workspace, backed by branches in a single git repo." \
          "[claude-profiles] No profiles repo is configured (~/.config/claude-profiles/config.json is missing or has no source). The user has not yet configured a profiles repo. Profiles are per-workspace .claude folders backed by branches of a single git repo (one branch per scenario: rust-cli, web-dev, etc.). Run /claude-profiles:init to configure one before adopting any workspace into a profile."
     exit 0

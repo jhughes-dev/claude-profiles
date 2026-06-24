@@ -88,3 +88,4 @@ Next steps:
 - `/claude-profiles:set` to configure a workspace's `.claude`.
 - `/claude-profiles:status` to see if a workspace's profile is in sync.
 - `/claude-profiles:update` to pull and push profile changes.
+- `/claude-profiles:source add <name> <url>` to draw profiles from additional repos.

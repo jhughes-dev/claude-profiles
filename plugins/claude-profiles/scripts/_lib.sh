@@ -124,37 +124,27 @@ latest_release_version() { # <repo>
     | sort -t. -k1,1n -k2,2n -k3,3n | tail -n1
 }
 
-# --- default-source accessors (single-source behavior; schema supports many) ---
+# --- multi-source config (issue #1) ---
+#
+# The config holds an array of sources, each a profiles repo. Pure-bash I/O goes
+# through a flat "dump" intermediate so we can manipulate the array without jq:
+#   S<TAB>name<TAB>repo<TAB>default      (one per source)
+#   P<TAB>name<TAB>branch<TAB>desc       (one cached profile, under its source)
+# jq is used for the dump/parse when present; otherwise a layout-aware awk parser
+# reads the writer's own format (one source key per line, one profile per line).
 
-_pcfg_read_repo() {
+# Flatten config.json to the S/P dump format above.
+pcfg_dump() {
   local file; file="$(pcfg_file)"
   [ -f "$file" ] || return 0
   if command -v jq >/dev/null 2>&1; then
-    jq -r '(.sources[0].repo) // empty' "$file" 2>/dev/null
-  else
-    _json_scan "$file" repo
-  fi
-}
-
-_pcfg_read_name() {
-  local file; file="$(pcfg_file)"
-  [ -f "$file" ] || return 0
-  if command -v jq >/dev/null 2>&1; then
-    jq -r '(.sources[0].name) // empty' "$file" 2>/dev/null
-  else
-    _json_scan "$file" name
-  fi
-}
-
-# Emit the default source's profiles as `branch<TAB>description` lines.
-_pcfg_profiles_tsv() {
-  local file; file="$(pcfg_file)"
-  [ -f "$file" ] || return 0
-  if command -v jq >/dev/null 2>&1; then
-    jq -r '(.sources[0].profiles // [])[] | [.branch, (.description // "")] | @tsv' "$file" 2>/dev/null
+    jq -r '
+      .sources[]? |
+      ( "S\t" + .name + "\t" + (.repo // "") + "\t" + ((.default // false) | tostring) ),
+      ( .name as $n | (.profiles[]? | "P\t" + $n + "\t" + .branch + "\t" + (.description // "")) )
+    ' "$file" 2>/dev/null
     return
   fi
-  # No-jq: one profile object per line; scan branch + description with escapes.
   awk '
     function unescape(s,   r, i, c, n) {
       r = ""; n = length(s)
@@ -173,7 +163,8 @@ _pcfg_profiles_tsv() {
       rest = substr(line, pos + length(key) + 2)
       cpos = index(rest, ":"); if (cpos == 0) return ""
       rest = substr(rest, cpos + 1)
-      qpos = index(rest, "\""); if (qpos == 0) return ""
+      qpos = index(rest, "\"")
+      if (qpos == 0) { sub(/^[ \t]*/, "", rest); sub(/[ \t,].*$/, "", rest); return rest }
       rest = substr(rest, qpos + 1)
       out = ""; n = length(rest); esc = 0
       for (i = 1; i <= n; i++) {
@@ -185,42 +176,63 @@ _pcfg_profiles_tsv() {
       }
       return unescape(out)
     }
+    # Source scalar keys live on their own lines (never on a profile line).
+    /"name"[ \t]*:/    && $0 !~ /"branch"/ { i++; sn[i] = field($0, "name"); sd[i] = "false"; next }
+    /"repo"[ \t]*:/    && $0 !~ /"branch"/ { if (i > 0) sr[i] = field($0, "repo"); next }
+    /"default"[ \t]*:/ && $0 !~ /"branch"/ { if (i > 0) sd[i] = field($0, "default"); next }
     /"branch"[ \t]*:/ {
-      b = field($0, "branch")
-      if (b != "") print b "\t" field($0, "description")
+      if (i > 0) { pc[i]++; pb[i, pc[i]] = field($0, "branch"); pd[i, pc[i]] = field($0, "description") }
+    }
+    END {
+      for (s = 1; s <= i; s++) {
+        printf "S\t%s\t%s\t%s\n", sn[s], sr[s], sd[s]
+        for (p = 1; p <= pc[s]; p++) printf "P\t%s\t%s\t%s\n", sn[s], pb[s, p], pd[s, p]
+      }
     }
   ' "$file"
 }
 
-# Write the whole config: <repo> <source-name>, profiles as TSV on stdin.
-_pcfg_write() {
-  local repo="$1" name="${2:-default}" file dir tmp
-  file="$(pcfg_file)"; dir="$(pcfg_dir)"
-  mkdir -p "$dir"
-  tmp="$file.tmp.$$"
-  {
-    printf '{\n'
-    printf '  "$schema": "%s",\n' "$PCFG_SCHEMA_URL"
-    printf '  "version": 1,\n'
-    printf '  "sources": [\n'
-    printf '    {\n'
-    printf '      "name": "%s",\n' "$(json_escape "$name")"
-    printf '      "repo": "%s",\n' "$(json_escape "$repo")"
-    printf '      "default": true,\n'
-    printf '      "profiles": ['
-    local first=1 b d
-    while IFS=$'\t' read -r b d; do
-      [ -n "$b" ] || continue
-      if [ "$first" = 1 ]; then first=0; printf '\n'; else printf ',\n'; fi
-      printf '        { "branch": "%s", "description": "%s" }' \
-        "$(json_escape "$b")" "$(json_escape "$d")"
-    done
-    if [ "$first" = 1 ]; then printf ']\n'; else printf '\n      ]\n'; fi
-    printf '    }\n'
-    printf '  ]\n'
-    printf '}\n'
-  } > "$tmp"
+# Emit config.json from an S/P dump on stdin (profiles grouped under their source).
+_pcfg_write_from_dump() {
+  local file dir tmp; file="$(pcfg_file)"; dir="$(pcfg_dir)"; mkdir -p "$dir"; tmp="$file.tmp.$$"
+  awk -F'\t' -v schema="$PCFG_SCHEMA_URL" '
+    function esc(s) { gsub(/\\/, "\\\\", s); gsub(/"/, "\\\"", s); return s }
+    $1 == "S" { ns++; sn[ns] = $2; sr[ns] = $3; sd[ns] = ($4 == "true" ? "true" : "false"); idx[$2] = ns }
+    $1 == "P" { k = idx[$2]; if (k) { pc[k]++; pb[k, pc[k]] = $3; pd[k, pc[k]] = $4 } }
+    END {
+      printf "{\n  \"$schema\": \"%s\",\n  \"version\": 1,\n  \"sources\": [", schema
+      if (ns == 0) { printf "]\n}\n"; exit }
+      printf "\n"
+      for (s = 1; s <= ns; s++) {
+        printf "    {\n      \"name\": \"%s\",\n      \"repo\": \"%s\",\n      \"default\": %s,\n      \"profiles\": [",
+          esc(sn[s]), esc(sr[s]), sd[s]
+        if (pc[s] == 0) { printf "]" } else {
+          printf "\n"
+          for (p = 1; p <= pc[s]; p++)
+            printf "        { \"branch\": \"%s\", \"description\": \"%s\" }%s\n",
+              esc(pb[s, p]), esc(pd[s, p]), (p < pc[s] ? "," : "")
+          printf "      ]"
+        }
+        printf "\n    }%s\n", (s < ns ? "," : "")
+      }
+      printf "  ]\n}\n"
+    }
+  ' > "$tmp"
   mv "$tmp" "$file"
+}
+
+# Ensure exactly one source is marked default (the first, if none is).
+_pcfg_ensure_default() {
+  awk -F'\t' '
+    { line[NR] = $0
+      if ($1 == "S") { if ($4 == "true") hasdef = 1; if (!firstS) firstS = NR } }
+    END {
+      for (n = 1; n <= NR; n++) {
+        if (!hasdef && n == firstS) {
+          split(line[n], a, "\t"); printf "%s\t%s\t%s\ttrue\n", a[1], a[2], a[3]
+        } else print line[n]
+      }
+    }'
 }
 
 # Migrate a legacy ~/.claude-profiles-config (key=value) to JSON, once.
@@ -231,60 +243,134 @@ pcfg_migrate() {
   local repo branches
   repo=$(sed -n 's/^repo=//p' "$old" | head -n1)
   branches=$(sed -n 's/^branches=//p' "$old" | head -n1)
-  ( IFS=,; for b in $branches; do [ -n "$b" ] && printf '%s\t\n' "$b"; done ) \
-    | _pcfg_write "$repo" "default"
+  {
+    printf 'S\tdefault\t%s\ttrue\n' "$repo"
+    ( IFS=,; for b in $branches; do [ -n "$b" ] && printf 'P\tdefault\t%s\t\n' "$b"; done )
+  } | _pcfg_write_from_dump
   mv "$old" "$old.migrated-to-json" 2>/dev/null || true
 }
 
-# --- public config API ---
+# --- public config API: sources ---
 
-pcfg_default_repo() { pcfg_migrate; _pcfg_read_repo; }
+# List all source names, one per line.
+pcfg_sources() { pcfg_migrate; pcfg_dump | awk -F'\t' '$1 == "S" { print $2 }'; }
 
+# Name of the default source (the one flagged default, else the first).
 pcfg_default_source_name() {
   pcfg_migrate
-  local n; n=$(_pcfg_read_name); printf '%s' "${n:-default}"
+  pcfg_dump | awk -F'\t' '
+    $1 == "S" { if ($4 == "true") { print $2; found = 1; exit } if (first == "") first = $2 }
+    END { if (!found && first != "") print first }'
 }
 
-pcfg_branches_csv() { pcfg_migrate; _pcfg_profiles_tsv | cut -f1 | paste -sd, -; }
-
-pcfg_description() { # <branch>
+# Repo URL for a named source.
+pcfg_source_repo() { # <name>
   pcfg_migrate
-  _pcfg_profiles_tsv | awk -F'\t' -v b="$1" '$1==b{print $2; exit}'
+  pcfg_dump | awk -F'\t' -v n="$1" '$1 == "S" && $2 == n { print $3; exit }'
 }
 
-pcfg_set_repo() { # <url>  — preserves cached profiles
+# Cached branches for a named source, as CSV.
+pcfg_source_branches_csv() { # <name>
   pcfg_migrate
-  local url="$1" name
-  name=$(_pcfg_read_name); name="${name:-default}"
-  _pcfg_profiles_tsv | _pcfg_write "$url" "$name"
+  pcfg_dump | awk -F'\t' -v n="$1" '$1 == "P" && $2 == n { print $3 }' | paste -sd, -
 }
 
-pcfg_set_branches_csv() { # <csv>  — preserves existing descriptions by branch
+# Source names that have <branch> cached, one per line (for disambiguation).
+pcfg_find_sources_for_branch() { # <branch>
   pcfg_migrate
-  local csv="$1" repo name existing b d
-  repo=$(_pcfg_read_repo); name=$(_pcfg_read_name); name="${name:-default}"
-  existing=$(_pcfg_profiles_tsv)
-  ( IFS=,
+  pcfg_dump | awk -F'\t' -v b="$1" '$1 == "P" && $3 == b { print $2 }'
+}
+
+# Add a source (or update its repo if the name exists). [default] marks it default.
+pcfg_add_source() { # <name> <repo> [default]
+  pcfg_migrate
+  local name="$1" repo="$2" makedef="${3:-}" dump
+  dump=$(pcfg_dump)
+  if printf '%s\n' "$dump" | awk -F'\t' -v n="$name" '$1 == "S" && $2 == n { f = 1 } END { exit !f }'; then
+    dump=$(printf '%s\n' "$dump" | awk -F'\t' -v n="$name" -v r="$repo" 'BEGIN { OFS = "\t" } $1 == "S" && $2 == n { $3 = r } { print }')
+  else
+    dump=$(printf '%s\nS\t%s\t%s\tfalse' "$dump" "$name" "$repo")
+  fi
+  [ "$makedef" = default ] && dump=$(printf '%s\n' "$dump" | awk -F'\t' -v n="$name" 'BEGIN { OFS = "\t" } $1 == "S" { $4 = ($2 == n ? "true" : "false") } { print }')
+  printf '%s\n' "$dump" | _pcfg_ensure_default | _pcfg_write_from_dump
+}
+
+# Remove a source (and its cached profiles).
+pcfg_remove_source() { # <name>
+  pcfg_migrate
+  pcfg_dump | awk -F'\t' -v n="$1" '$2 != n' | _pcfg_ensure_default | _pcfg_write_from_dump
+}
+
+# Mark a source as the default.
+pcfg_set_default_source() { # <name>
+  pcfg_migrate
+  pcfg_dump | awk -F'\t' -v n="$1" 'BEGIN { OFS = "\t" } $1 == "S" { $4 = ($2 == n ? "true" : "false") } { print }' \
+    | _pcfg_write_from_dump
+}
+
+# --- back-compat single-(default-)source helpers ---
+
+pcfg_default_repo() { pcfg_migrate; pcfg_source_repo "$(pcfg_default_source_name)"; }
+
+pcfg_branches_csv() { pcfg_migrate; pcfg_source_branches_csv "$(pcfg_default_source_name)"; }
+
+pcfg_description() { # <branch> [source]
+  pcfg_migrate
+  local src="${2:-}"
+  pcfg_dump | awk -F'\t' -v b="$1" -v s="$src" '$1 == "P" && $3 == b && (s == "" || $2 == s) { print $4; exit }'
+}
+
+# Set the (default or named) source's repo, creating the source if needed.
+pcfg_set_repo() { # <url> [source]
+  pcfg_migrate
+  local url="$1" name="${2:-}"
+  [ -n "$name" ] || name=$(pcfg_default_source_name)
+  [ -n "$name" ] || name=default
+  pcfg_add_source "$name" "$url"
+}
+
+# Replace a source's cached branch list, preserving existing descriptions.
+pcfg_set_branches_csv() { # <csv> [source]
+  pcfg_migrate
+  local csv="$1" src="${2:-}" dump existing kept newp b d
+  [ -n "$src" ] || src=$(pcfg_default_source_name)
+  dump=$(pcfg_dump)
+  existing=$(printf '%s\n' "$dump" | awk -F'\t' -v s="$src" '$1 == "P" && $2 == s { print $3 "\t" $4 }')
+  kept=$(printf '%s\n' "$dump" | awk -F'\t' -v s="$src" '!($1 == "P" && $2 == s)')
+  newp=$( ( IFS=,
     for b in $csv; do
       [ -n "$b" ] || continue
-      d=$(printf '%s\n' "$existing" | awk -F'\t' -v x="$b" '$1==x{print $2; exit}')
-      printf '%s\t%s\n' "$b" "$d"
-    done
-  ) | _pcfg_write "$repo" "$name"
+      d=$(printf '%s\n' "$existing" | awk -F'\t' -v x="$b" '$1 == x { print $2; exit }')
+      printf 'P\t%s\t%s\t%s\n' "$src" "$b" "$d"
+    done ) )
+  printf '%s\n%s\n' "$kept" "$newp" | _pcfg_write_from_dump
 }
 
-pcfg_set_description() { # <branch> <description>  (issue #3)
+pcfg_set_description() { # <branch> <description> [source]  (issue #3)
   pcfg_migrate
-  local branch="$1" desc="$2" repo name existing
-  repo=$(_pcfg_read_repo); name=$(_pcfg_read_name); name="${name:-default}"
-  existing=$(_pcfg_profiles_tsv)
-  {
-    printf '%s\n' "$existing" | awk -F'\t' -v b="$branch" -v d="$desc" '
-      $1 == "" { next }
-      { if ($1 == b) { print $1 "\t" d; found = 1 } else { print } }
-      END { if (!found) print b "\t" d }'
-  } | _pcfg_write "$repo" "$name"
+  local branch="$1" desc="$2" src="${3:-}"
+  [ -n "$src" ] || src=$(pcfg_default_source_name)
+  pcfg_dump | awk -F'\t' -v s="$src" -v b="$branch" -v d="$desc" '
+    BEGIN { OFS = "\t" }
+    $1 == "P" && $2 == s && $3 == b { $4 = d; found = 1 }
+    { print }
+    END { if (!found) print "P", s, b, d }' | _pcfg_write_from_dump
 }
+
+# --- active source (the source a command/script is operating on) ---
+#
+# Scripts operate on the "active" source: the CLAUDE_PROFILES_SOURCE override if
+# set (the `set` command sets it after disambiguating a branch), else the default
+# source. With a single source these both resolve to it, so callers stay simple.
+
+pcfg_active_source() {
+  pcfg_migrate
+  local s="${CLAUDE_PROFILES_SOURCE:-}"
+  [ -n "$s" ] || s=$(pcfg_default_source_name)
+  printf '%s' "$s"
+}
+
+pcfg_active_repo() { pcfg_source_repo "$(pcfg_active_source)"; }
 
 # --- workspace marker (the <workspace>/.claude-profiles file) ---
 

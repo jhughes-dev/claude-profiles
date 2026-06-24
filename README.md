@@ -52,10 +52,20 @@ Once `/claude-profiles:init` is done, in any workspace:
 /claude-profiles:set --none           # mark workspace as no-profile
 /claude-profiles:status               # show sync status of this workspace's profile
 /claude-profiles:update               # pull + push this workspace's profile (resolve conflicts)
+/claude-profiles:source list          # list profile sources
+/claude-profiles:source add work git@host:team/profiles.git   # draw profiles from another repo
 ```
 
 The plugin's `SessionStart` hook reminds you to commit/push profile changes,
 pull updates, or run `/claude-profiles:set` in workspaces that don't have one yet.
+
+## Multiple sources
+
+Profiles can come from more than one repo — e.g. a personal repo plus a shared
+team repo. Manage them with `/claude-profiles:source` (`add`/`remove`/`list`/`default`).
+`/claude-profiles:set <branch>` finds which source provides a branch and asks
+when several share the same name; the chosen source is recorded in the
+workspace marker's `source` field so future syncs pull from the right repo.
 
 A `.claude-profiles` marker (JSON) at the workspace root records the chosen
 profile — `{ "version": 1, "profile": "<branch>", "source": "<name>", "repo":

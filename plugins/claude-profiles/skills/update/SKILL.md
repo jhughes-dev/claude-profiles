@@ -1,5 +1,7 @@
 ---
+name: update
 description: Pull then push this workspace's .claude profile branch, prompting on conflicts
+disable-model-invocation: true
 ---
 
 Sync this workspace's `.claude` profile with its remote.

@@ -1,6 +1,8 @@
 ---
+name: source
 description: Manage profile sources (the git repos that provide profile branches)
 argument-hint: "[list | add <name> <url> [--default] | remove <name> | default <name>]"
+disable-model-invocation: true
 ---
 
 Manage the profile **sources** in `~/.config/claude-profiles/config.json`. Each

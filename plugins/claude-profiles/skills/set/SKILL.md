@@ -1,6 +1,8 @@
 ---
+name: set
 description: Configure the Claude profile (.claude folder) for this workspace
 argument-hint: "[branch | --new <branch> [--from <a>,<b>,...] | --adopt <branch> | --none]"
+disable-model-invocation: true
 ---
 
 Configure this workspace's `.claude` folder from the user's profiles repo.

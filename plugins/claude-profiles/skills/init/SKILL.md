@@ -1,5 +1,7 @@
 ---
+name: init
 description: First-time setup for the claude-profiles system (configure profiles repo and capture current ~/.claude)
+disable-model-invocation: true
 ---
 
 Walk the user through configuring a profiles repo for the first time.

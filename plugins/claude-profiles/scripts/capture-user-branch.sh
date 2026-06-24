@@ -14,10 +14,12 @@
 set -uo pipefail
 
 dir="$HOME/.claude"
-config="$HOME/.claude-profiles-config"
-repo=$(sed -n 's/^repo=//p' "$config" 2>/dev/null | head -n1)
+here="$(dirname "$0")"
+# shellcheck source=_lib.sh
+. "$here/_lib.sh"
+repo=$(pcfg_default_repo)
 if [ -z "$repo" ]; then
-  echo "no repo= in $config — run /claude-profiles:init first" >&2
+  echo "no profiles repo configured — run /claude-profiles:init first" >&2
   exit 1
 fi
 [ -d "$dir" ] || { echo "$dir does not exist" >&2; exit 1; }

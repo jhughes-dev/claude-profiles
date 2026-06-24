@@ -17,10 +17,12 @@ branch="${1:?usage: adopt-profile.sh <branch> [workspace-dir]}"
 workspace="${2:-${CLAUDE_PROJECT_DIR:-$PWD}}"
 dir="$workspace/.claude"
 
-config="$HOME/.claude-profiles-config"
-repo=$(sed -n 's/^repo=//p' "$config" 2>/dev/null | head -n1)
+here="$(dirname "$0")"
+# shellcheck source=_lib.sh
+. "$here/_lib.sh"
+repo=$(pcfg_default_repo)
 if [ -z "$repo" ]; then
-  echo "no repo= in $config — run /claude-profiles:init" >&2
+  echo "no profiles repo configured — run /claude-profiles:init" >&2
   exit 1
 fi
 if [ ! -d "$dir" ]; then

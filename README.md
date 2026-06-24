@@ -57,8 +57,12 @@ Once `/claude-profiles:init` is done, in any workspace:
 The plugin's `SessionStart` hook reminds you to commit/push profile changes,
 pull updates, or run `/claude-profiles:set` in workspaces that don't have one yet.
 
-A `.claude-profiles` marker at the workspace root records the chosen profile
-(format: `profile=<branch>` and `repo=<url>` keys, one per line). Commit it.
+A `.claude-profiles` marker (JSON) at the workspace root records the chosen
+profile — `{ "version": 1, "profile": "<branch>", "source": "<name>", "repo":
+"<url>" }`. Commit it. User-level config lives at
+`~/.config/claude-profiles/config.json`. Both follow the schemas in
+[`plugins/claude-profiles/schemas/`](plugins/claude-profiles/schemas/); legacy
+`key=value` files from earlier versions are read and migrated automatically.
 
 ## Maintenance
 

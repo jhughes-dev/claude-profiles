@@ -5,19 +5,20 @@ argument-hint: "[branch | --new <branch> [--from <a>,<b>,...] | --adopt <branch>
 
 Configure this workspace's `.claude` folder from the user's profiles repo.
 
-Read the repo URL from `~/.claude-profiles-config` (the `repo=` line). If the
-file is missing or has no `repo=`, tell the user to run `/claude-profiles:init`
-first and stop. The bundled scripts under `${CLAUDE_PLUGIN_ROOT}/scripts/` read
-this same config; you don't need to pass the URL around explicitly.
+The profiles repo URL comes from the JSON config at
+`~/.config/claude-profiles/config.json` (the default source's `repo`). If no
+profiles repo is configured, tell the user to run `/claude-profiles:init` first
+and stop. The bundled scripts under `${CLAUDE_PLUGIN_ROOT}/scripts/` read this
+same config; you don't need to pass the URL around explicitly.
 
 Arguments given: "$ARGUMENTS"
 
 ## 1. Pre-check the marker
 
 If a `.claude-profiles` marker already exists at the workspace root, the user is
-asking to change the profile. Show the current `profile=` value and confirm
-before proceeding. On yes, delete the existing `.claude/` folder (if any) and
-continue. The marker will be rewritten in step 5.
+asking to change the profile. Show the current profile (the marker's `profile`
+field) and confirm before proceeding. On yes, delete the existing `.claude/`
+folder (if any) and continue. The marker will be rewritten in step 5.
 
 ## 2. Determine the mode
 

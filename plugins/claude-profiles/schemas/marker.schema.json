@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/jhughes-dev/claude-profiles/blob/main/plugins/claude-profiles/schemas/marker.schema.json",
+  "title": "claude-profiles workspace marker",
+  "description": "Per-workspace marker recording which profile a workspace uses. Lives at <workspace>/.claude-profiles and is committed with the workspace.",
+  "type": "object",
+  "required": ["version", "profile"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": {
+      "const": 1,
+      "description": "Marker schema version."
+    },
+    "profile": {
+      "type": "string",
+      "description": "Profile branch name for this workspace, or the literal \"none\" to record an explicit opt-out."
+    },
+    "source": {
+      "type": "string",
+      "description": "Name of the source (config.sources[].name) this profile comes from. Omitted/optional while only one source exists. (Issue #1.)"
+    },
+    "repo": {
+      "type": "string",
+      "description": "Repo URL of the source, recorded for reference. Omitted when profile is \"none\"."
+    }
+  }
+}

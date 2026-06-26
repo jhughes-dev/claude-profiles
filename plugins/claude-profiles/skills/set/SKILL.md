@@ -57,26 +57,34 @@ folder (if any) and continue. The marker will be rewritten in step 5.
   descriptions to help the user choose; a profile's description is filled in once
   it's been cloned/adopted (or set via `/claude-profiles:describe`).
 
+  **Recommend a match first.** Run
+  `bash "${CLAUDE_PLUGIN_ROOT}/scripts/detect-project.sh"` to infer the
+  workspace's stack (e.g. `rust`, `node`, `tauri`, `claude-plugin`). Match those
+  traits against the branch names and descriptions and surface the best-fitting
+  profile(s) at the top of the menu, before the full list.
+
 ## 3. Execute the chosen mode
 
 ### 3a. Existing branch
 
 Resolve the source first (see **Source resolution** above) and export
-`CLAUDE_PROFILES_SOURCE` if more than one source exists. Then:
+`CLAUDE_PROFILES_SOURCE` if more than one source exists. Then run the one-shot
+setup (clone + `.gitignore` + marker + cache refresh, in one deterministic step):
 
-`bash "${CLAUDE_PLUGIN_ROOT}/scripts/clone-profile.sh" <branch>`
+`bash "${CLAUDE_PLUGIN_ROOT}/scripts/setup-profile.sh" <branch>`
 
-If `.claude` already exists, ask before deleting it; the script refuses to
-overwrite.
+Parse its `state=`/`summary=` output and report it. If `.claude` already exists,
+ask before deleting it; the script refuses to overwrite. **It already does steps
+4 and 5 — skip them.**
 
 ### 3b. New from template
 
-`bash "${CLAUDE_PLUGIN_ROOT}/scripts/clone-profile.sh" template <branch>`
+`bash "${CLAUDE_PLUGIN_ROOT}/scripts/setup-profile.sh" --new <branch>`
 
-The script creates the branch locally *and pushes it to the remote* so the
-profile is immediately visible to other workspaces. Then run
-`bash "${CLAUDE_PLUGIN_ROOT}/scripts/refresh-branches-cache.sh"` and tell the
-user to customize `.claude/` — subsequent edits push from `.claude` as normal.
+This forks the `template` branch into a new `<branch>`, pushes it, ignores
+`.claude/`, writes the marker, and refreshes the cache. (Add `--from <base>` to
+fork a different base branch.) Tell the user to customize `.claude/` — subsequent
+edits push from `.claude` as normal. **Steps 4 and 5 are handled — skip them.**
 
 ### 3d. Merge existing profiles into a new branch
 
@@ -104,7 +112,10 @@ The script handles three cases (no git, our remote already, different remote)
 and exits non-zero with an explanation if it can't proceed. After a successful
 adopt, run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/refresh-branches-cache.sh"`.
 
-## 4. Update workspace .gitignore
+## 4. Update workspace .gitignore (adopt/merge paths only)
+
+*(3a and 3b already did steps 4 and 5 via `setup-profile.sh`. Do steps 4–5 only
+for the adopt (3c) and merge (3d) paths.)*
 
 Run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/ensure-gitignore.sh"` and parse the
 `state=` line:

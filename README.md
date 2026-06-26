@@ -16,7 +16,7 @@ one up.
 In Claude Code:
 
 ```text
-/plugin marketplace add git@github.com:jhughes-dev/claude-profiles.git
+/plugin marketplace add https://github.com/jhughes-dev/claude-profiles.git
 /plugin install claude-profiles@claude-profiles
 ```
 
@@ -24,7 +24,11 @@ Then run `/claude-profiles:init` to configure your profiles repo. The wizard han
 
 - Pointing at an **existing** repo (URL or local path).
 - Creating **a new remote** (uses `gh`/`glab` if available).
-- Initializing a **new local** bare repo.
+- Initializing a **new local** bare repo, seeded with starter content.
+
+A local bare repo is a fully supported, no-server option: it's a real git remote
+addressed as `file://<path>`, so every workspace clones, pushes, and pulls it
+exactly like a hosted one. You can always push it to a hosting service later.
 
 It will also offer to capture your current `~/.claude` config as your user
 profile on your new profiles repo (without overwriting any live files). The
@@ -33,8 +37,9 @@ user-profile branch name is your choice — `user` by default, or any name (e.g.
 
 ## Your profiles repo
 
-`/claude-profiles:init` sets up a separate git repo that you own. It is **not**
-this plugin repo — it holds your profiles, one per branch:
+`/claude-profiles:init` sets up a separate git repo that you own — **any** git
+repo is sufficient: a hosted remote (GitHub/GitLab) *or* a purely local bare repo
+on your machine. It just holds your profiles, one per branch:
 
 | Branch | Role |
 | --- | --- |

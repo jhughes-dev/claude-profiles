@@ -1,7 +1,9 @@
 {
   "name": "claude-profiles",
+  "description": "Manage per-workspace .claude profiles as git branches — switch, sync, and share Claude Code configuration per project.",
   "owner": {
-    "name": "jhughes"
+    "name": "Jeremy Hughes",
+    "url": "https://github.com/jhughes-dev"
   },
   "plugins": [
     {

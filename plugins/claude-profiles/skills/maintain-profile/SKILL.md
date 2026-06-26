@@ -8,7 +8,7 @@ description: Use when installing/enabling Claude Code plugins, adding skills/hoo
 A claude-profile is a git branch cloned into a workspace's `.claude/` folder.
 One branch per scenario (e.g. `rust-cli`, `web-dev`); switch by switching
 workspaces, not by editing config. The `template` branch holds shared starter
-content that new profiles fork from. A `.claude-profiles` marker at the
+content that new profiles branch from. A `.claude-profiles` marker at the
 workspace root records which profile this workspace expects (commit it to the
 project repo). Treat the profile as **configuration**, not as a place to
 install software.

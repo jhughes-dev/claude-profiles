@@ -1,0 +1,17 @@
+# claude-profiles: runtime state
+backups/
+cache/
+debug/
+file-history/
+history.jsonl
+ide/
+paste-cache/
+projects/
+session-env/
+mcp-needs-auth-cache.json
+.last-cleanup
+# plugin runtime
+plugins/cache/
+plugins/marketplaces/
+plugins/blocklist.json
+plugins/plugin-catalog-cache.json

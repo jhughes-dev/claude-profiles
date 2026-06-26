@@ -6,10 +6,10 @@ disable-model-invocation: true
 
 Walk the user through configuring a profiles repo for the first time.
 
-The "upstream" repo (used by the *new remote (fork)* path below) defaults to
-`git@github.com:jhughes-dev/claude-profiles.git`. If the user has
-exported `CLAUDE_PROFILES_UPSTREAM` in their environment, use that value
-instead. Otherwise use the default; do not prompt for it.
+New profiles repos are seeded with starter content — a `main` landing branch and
+a `template` profile — bundled with the plugin under
+`${CLAUDE_PLUGIN_ROOT}/starter/`. There is no external upstream to fork or
+depend on: the repo the user ends up with is entirely their own.
 
 ## 1. Short-circuit if already configured
 
@@ -23,41 +23,56 @@ Run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/check-config.sh"` and parse its
 
 ## 2. Choose how to host the profiles repo
 
-Ask the user one question with three options:
+Ask the user one question with three options. All three end with a repo that is
+entirely theirs — none of them fork or depend on the plugin's repo.
 
 - **Existing repo** — they already have one (local or remote).
-- **New remote** — fork the upstream on GitLab/GitHub.
-- **New local** — initialize a bare repo on this machine.
+- **New remote** — create a brand-new empty repo they own on GitHub/GitLab, then
+  seed it with the bundled starter.
+- **New local** — initialize a bare repo on this machine, seeded with the bundled
+  starter. A first-class option — a profiles repo never has to live on a hosting
+  service.
 
 ### Existing repo
 
 Ask for the URL or local path. Validate with `git ls-remote --heads "<url>"`.
 
-### New remote (fork)
+### New remote
 
-Detect available CLI:
+The goal is a **new, empty repo the user owns** — never a fork of the plugin's
+repo. Ask how they'd like to create it and help them through their choice:
 
-- If `glab` is installed and authenticated (`glab auth status` succeeds), run
-  `glab repo fork "$CLAUDE_PROFILES_UPSTREAM" --clone=false` and capture the URL.
-- Else if `gh` is installed and authenticated and the upstream is GitHub, run
-  `gh repo fork --clone=false`.
-- Else fall back: print the "fork in UI" URL (GitLab: append `/-/forks/new`;
-  GitHub: append `/fork`) and ask the user to paste the resulting fork URL.
+- **With a CLI** — if `gh` is installed and authenticated, run
+  `gh repo create <name> --private` (GitHub); if `glab` is, run
+  `glab repo create <name>` (GitLab). Capture the resulting URL.
+- **In the web UI** — have them create an empty repository (no README) on their
+  host and paste back the clone URL.
+
+Then seed it with the bundled starter by building the branches locally and
+pushing them up:
+
+```bash
+tmpbare="$(mktemp -d)/seed.git"
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/seed-local-repo.sh" "$tmpbare"
+git -C "$tmpbare" push "<new-repo-url>" main template
+```
+
+The repo URL is the one they just created.
 
 ### New local
 
 Ask for an absolute path (default `$HOME/claude-profiles.git`). Then run:
 
-`bash "${CLAUDE_PLUGIN_ROOT}/scripts/seed-local-repo.sh" <path> "$CLAUDE_PROFILES_UPSTREAM"`
+`bash "${CLAUDE_PLUGIN_ROOT}/scripts/seed-local-repo.sh" <path>`
 
-The script handles `git init --bare` (if needed) and pushes `main` and
-`template` from upstream into the new repo. If either branch is missing on
-upstream the script emits a `WARNING:` line on stderr — surface those warnings
-to the user verbatim. In particular, if `template` is missing, tell the user
-that `/claude-profiles:set --new` won't work until they create a `template`
-branch on the new repo.
+The script creates the bare repo (if needed) and seeds `main` and `template`
+from the plugin's bundled starter — no network and no upstream involved.
 
-The repo URL is `file://<path>`.
+The repo URL is `file://<path>`. A local bare repo is a real git remote: every
+workspace `/claude-profiles:set` clones from that `file://` URL exactly as it
+would from a hosted one, and you can `git clone`, push, and pull it like any
+remote. To move it onto a hosting service later, create an empty remote and
+`git -C <path> push <remote-url> --all`.
 
 ## 3. Persist the repo URL
 

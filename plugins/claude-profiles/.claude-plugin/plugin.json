@@ -3,9 +3,12 @@
   "version": "1.3.0",
   "description": "Manage per-workspace .claude profiles backed by a git repo of profile branches.",
   "author": {
-    "name": "jhughes"
+    "name": "Jeremy Hughes",
+    "url": "https://github.com/jhughes-dev"
   },
-  "repository": "git@github.com:jhughes-dev/claude-profiles.git",
+  "homepage": "https://github.com/jhughes-dev/claude-profiles",
+  "repository": "https://github.com/jhughes-dev/claude-profiles.git",
+  "license": "MIT",
   "keywords": ["profiles", "workspace", "git", "configuration"],
   "hooks": {
     "SessionStart": [

@@ -1,52 +1,51 @@
 #!/usr/bin/env bash
 # Initialize a bare repo at <path> (if missing) and seed it with `main` and
-# `template` from the upstream repo.
+# `template` branches built from the plugin's bundled starter content. No
+# network and no upstream repo is involved — the starter ships with the plugin.
 #
-# Usage: seed-local-repo.sh <bare-path> <upstream-url>
+# Usage: seed-local-repo.sh <bare-path> [starter-dir]
+#   [starter-dir] defaults to the plugin's bundled starter/ (../starter relative
+#   to this script). Override it in tests or to seed from custom content.
 set -uo pipefail
 
-path="${1:?usage: seed-local-repo.sh <bare-path> <upstream-url>}"
-upstream="${2:?usage: seed-local-repo.sh <bare-path> <upstream-url>}"
+path="${1:?usage: seed-local-repo.sh <bare-path> [starter-dir]}"
+starter="${2:-}"
+if [ -z "$starter" ]; then
+  starter="$(CDPATH= cd -- "$(dirname -- "$0")/../starter" && pwd)"
+fi
+
+for sub in main template; do
+  if [ ! -d "$starter/$sub" ]; then
+    echo "bundled starter content missing: $starter/$sub" >&2
+    exit 1
+  fi
+done
 
 if [ ! -d "$path" ]; then
-  git init --bare "$path" >/dev/null
-fi
-
-# Probe upstream for the branches we care about before cloning.
-remote_heads=$(git ls-remote --heads "$upstream" 2>/dev/null | awk '{sub("refs/heads/","",$2); print $2}')
-if [ -z "$remote_heads" ]; then
-  echo "could not list branches on $upstream — is it reachable?" >&2
-  exit 1
-fi
-have_main=0
-have_template=0
-printf '%s\n' "$remote_heads" | grep -qx main     && have_main=1
-printf '%s\n' "$remote_heads" | grep -qx template && have_template=1
-
-if [ "$have_main" = "0" ]; then
-  echo "WARNING: upstream $upstream has no 'main' branch — skipping." >&2
-fi
-if [ "$have_template" = "0" ]; then
-  echo "WARNING: upstream $upstream has no 'template' branch. /claude-profiles:set --new will not work until you create one (e.g. push the desired starter content as 'template' to your profiles repo)." >&2
-fi
-if [ "$have_main" = "0" ] && [ "$have_template" = "0" ]; then
-  echo "nothing to seed from $upstream" >&2
-  exit 1
+  git init --bare -b main "$path" >/dev/null
 fi
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
-git clone --quiet "$upstream" "$tmp/src" >/dev/null
 
-refs=""
-[ "$have_main" = "1" ]     && refs="$refs main:main"
-[ "$have_template" = "1" ] && {
-  git -C "$tmp/src" fetch -q origin template:template 2>/dev/null || true
-  refs="$refs template:template"
+# Build each branch in its own throwaway work tree, then push it into the bare
+# repo. Keeping the branches independent gives each a clean one-commit history.
+seed_branch() { # <branch> <content-dir>
+  local branch="$1" src="$2"
+  local work="$tmp/$branch"
+  git init -q -b "$branch" "$work"
+  cp -R "$src/." "$work/"
+  (
+    cd "$work"
+    git config user.email "claude-profiles@localhost"
+    git config user.name "claude-profiles"
+    git add -A
+    git commit -q -m "Seed $branch from bundled starter"
+    git push -q "$path" "$branch:$branch"
+  )
 }
 
-# shellcheck disable=SC2086
-git -C "$tmp/src" push "$path" $refs
+seed_branch main "$starter/main"
+seed_branch template "$starter/template"
 
-seeded=$(printf '%s' "$refs" | sed -e 's/^ *//' -e 's/ /, /g' -e 's/:[^,]*//g')
-echo "seeded $path with: $seeded (from $upstream)"
+echo "seeded $path with: main, template (from bundled starter)"

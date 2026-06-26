@@ -81,9 +81,9 @@ ask before deleting it; the script refuses to overwrite. **It already does steps
 
 `bash "${CLAUDE_PLUGIN_ROOT}/scripts/setup-profile.sh" --new <branch>`
 
-This forks the `template` branch into a new `<branch>`, pushes it, ignores
+This branches the `template` branch into a new `<branch>`, pushes it, ignores
 `.claude/`, writes the marker, and refreshes the cache. (Add `--from <base>` to
-fork a different base branch.) Tell the user to customize `.claude/` — subsequent
+branch from a different base.) Tell the user to customize `.claude/` — subsequent
 edits push from `.claude` as normal. **Steps 4 and 5 are handled — skip them.**
 
 ### 3d. Merge existing profiles into a new branch

@@ -82,6 +82,20 @@ plugin gitlinks, and the initial push. Surface its output to the user.
 
 If no: tell them they can run `/claude-profiles:set` later in any workspace.
 
+## 4b. Offer to set up this workspace now (autodetect)
+
+If the current workspace looks like a real project (not the home dir), run
+`bash "${CLAUDE_PLUGIN_ROOT}/scripts/detect-project.sh"` to infer its stack and
+offer to set up a fitting profile right away rather than leaving a generic menu
+for later:
+
+- Match the detected traits (e.g. `rust`, `node`, `tauri`, `claude-plugin`)
+  against the available branches (`list-branches.sh --by-source`, with their
+  descriptions).
+- If a branch clearly fits, propose `/claude-profiles:set <branch>`; if nothing
+  fits, propose `/claude-profiles:set --new <name>` seeded from `template`.
+- Only proceed on the user's confirmation.
+
 ## 5. Summary
 
 Print:

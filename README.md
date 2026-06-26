@@ -47,7 +47,7 @@ this plugin repo — it holds your profiles, one per branch:
 Once `/claude-profiles:init` is done, in any workspace:
 
 ```text
-/claude-profiles:set                  # interactive branch picker
+/claude-profiles:set                  # interactive picker — detects the repo's stack and suggests a fit
 /claude-profiles:set rust-cli         # clone a specific profile
 /claude-profiles:set --new my-thing   # new branch from template, configure then push
 /claude-profiles:set --new combo --from rust-cli,addons-dev   # merge two profiles into a new branch

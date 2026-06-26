@@ -66,6 +66,20 @@ When the user says "add plugin X to this profile":
 If you find plugin source files that have been copied into a profile branch,
 flag it — they should be removed and replaced with an enable-list entry.
 
+**Keep `enabledPlugins` lists minimal — list only `true` entries.** A plugin
+that is installed but absent from `enabledPlugins` is simply off; you don't need
+an explicit `false` to keep it dormant. In the global `~/.claude/settings.json`,
+enable only plugins you want in *every* workspace; let each profile turn on its
+own subset with `true`.
+
+Watch out: **toggling a plugin off in the `/plugin` UI writes an explicit
+`false` back into whichever settings scope is active.** Those `false` entries
+are redundant and, worse, a global `false` against a profile's `true` produces a
+"disabled globally, but enabled here" override warning every session. Prefer
+managing enables by editing the profile's `.claude/settings.json` directly over
+using the global `/plugin` toggle. If you find stray `false` entries (especially
+in the global config), offer to strip them down to just the `true` ones.
+
 ## Other profile maintenance guidance
 
 - **Shared content lives in `template`.** Skills, agents, or CLAUDE.md snippets

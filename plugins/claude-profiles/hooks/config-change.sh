@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# ConfigChange hook:
-#  - On any profile-affecting change, nudge to commit/push the profile branch.
-#  - On user_settings changes, detect newly-enabled global plugins and ask
-#    whether they should also be enabled in the workspace's profile branch.
+# ConfigChange hook (issue #9):
+#  - Detect anything newly added to the user's GLOBAL ~/.claude (enabled plugins,
+#    skills, agents, commands, hooks) since the session-start baseline, and ask
+#    whether it should move into this workspace's profile, go into local settings,
+#    or stay global on purpose. Works whether or not the workspace has a profile.
+#  - If the workspace has a profile, also nudge to commit/push pending changes.
 # Never blocks.
 set -uo pipefail
 
@@ -13,60 +15,28 @@ here="$(dirname "$0")"
 workspace="${CLAUDE_PROJECT_DIR:-$PWD}"
 dir="$workspace/.claude"
 
+# Don't nag about the global config dir itself.
 [ "$workspace" = "$HOME/.claude" ] && exit 0
+
 profile=$(read_marker_profile "$workspace")
-[ -n "$profile" ] && [ "$profile" != "none" ] || exit 0
-[ -d "$dir/.git" ] || exit 0
+has_profile=0
+[ -n "$profile" ] && [ "$profile" != "none" ] && [ -d "$dir/.git" ] && has_profile=1
 
-# Read hook input (best-effort) to learn the source.
-input=""
-[ -t 0 ] || input=$(cat 2>/dev/null || true)
-source_field=""
-if [ -n "$input" ]; then
-  if command -v jq >/dev/null 2>&1; then
-    source_field=$(printf '%s' "$input" | jq -r '.source // empty' 2>/dev/null)
-  else
-    source_field=$(printf '%s' "$input" | tr -d '\n' \
-      | sed -n 's/.*"source"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
-  fi
-fi
+# --- Detect additions to global ~/.claude vs the baseline -------------------
+# The baseline is seeded at SessionStart and refreshed after each event, so we
+# notice changes made during the session. list-user-components enumerates the
+# global config (enabled plugins, skills, agents, commands, hooks, ...).
+cache="$HOME/.claude-profiles-global-cache"
+current=$(bash "$here/../scripts/list-user-components.sh" 2>/dev/null | sort -u)
+added=""
+[ -f "$cache" ] && added=$(comm -23 <(printf '%s\n' "$current") <(sort -u "$cache") 2>/dev/null || true)
+printf '%s\n' "$current" > "$cache"
 
-# Extract names of plugins set to true in an enabledPlugins map without jq.
-extract_enabled_plugins() {
-  local file="$1"
-  [ -f "$file" ] || return 0
-  if command -v jq >/dev/null 2>&1; then
-    jq -r '.enabledPlugins // {} | to_entries | map(select(.value == true)) | map(.key) | .[]' "$file" 2>/dev/null
-    return
-  fi
-  tr -d '\n' < "$file" \
-    | sed -n 's/.*"enabledPlugins"[[:space:]]*:[[:space:]]*{\([^}]*\)}.*/\1/p' \
-    | grep -oE '"[^"]+"[[:space:]]*:[[:space:]]*true' \
-    | sed -E 's/^"([^"]+)".*/\1/'
-}
-
-# --- New global plugin detection (user_settings only) ---
-new_plugins=""
-if [ "$source_field" = "user_settings" ]; then
-  global_settings="$HOME/.claude/settings.json"
-  cache="$HOME/.claude-profiles-enabled-plugins-cache"
-  if [ -f "$global_settings" ]; then
-    current=$(extract_enabled_plugins "$global_settings" | sort -u)
-    if [ -f "$cache" ]; then
-      previous=$(sort -u "$cache")
-      added=$(comm -23 <(printf '%s\n' "$current") <(printf '%s\n' "$previous"))
-      if [ -n "$added" ]; then
-        profile_enabled=$(extract_enabled_plugins "$dir/settings.json" | sort -u)
-        new_plugins=$(comm -23 <(printf '%s\n' "$added" | sort -u) <(printf '%s\n' "$profile_enabled") | paste -sd, -)
-      fi
-    fi
-    printf '%s\n' "$current" > "$cache"
-  fi
-fi
-
-# --- Profile sync state via the shared status script ---
-status_kv=$(bash "$here/../scripts/profile-status.sh" "$workspace" 2>/dev/null || true)
-action=$(kv_get "$status_kv" action)
+# Keep only meaningful additions: newly-enabled plugins and new components.
+added_list=$(printf '%s\n' "$added" | awk -F'\t' '
+  $1 == "plugin" && $3 == "true" { print "plugin " $2; next }
+  $1 == "skill" || $1 == "agent" || $1 == "command" || $1 == "hook" { print $1 " " $2 }
+')
 
 msg_parts=""
 ctx_parts=""
@@ -75,21 +45,31 @@ append() {
   if [ -z "$ctx_parts" ]; then ctx_parts="$2"; else ctx_parts="$ctx_parts $2"; fi
 }
 
-if [ -n "$new_plugins" ]; then
-  append "New global plugin(s) enabled: $new_plugins — also enable in profile '$profile'?" \
-         "[claude-profiles] The user just enabled these plugins globally in ~/.claude/settings.json: $new_plugins. They are NOT yet enabled in the workspace profile '$profile' (.claude/settings.json). Ask the user whether each new plugin belongs in this profile (so it'll be enabled automatically in any other workspace using this profile), or if it's intentionally global-only. If yes, add the entry to .claude/settings.json's enabledPlugins map and commit."
+if [ -n "$added_list" ]; then
+  items=$(printf '%s' "$added_list" | paste -sd'; ' -)
+  if [ "$has_profile" = 1 ]; then
+    append "Added to your global ~/.claude: $items — keep global, move into profile '$profile', or local settings?" \
+           "[claude-profiles] New config was added to the user's GLOBAL ~/.claude: $items. Ask the user, per item, whether it should (a) move into this workspace's profile '$profile' — for a plugin that means enabling it in .claude/settings.json's enabledPlugins; for a skill/agent/command/hook, copying it into .claude/<type>/ (the /claude-profiles:configure skill does this) — (b) go into local-only settings (.claude/settings.local.json), or (c) stay global on purpose. Apply the choice and, for profile changes, offer to commit + push."
+  else
+    append "Added to your global ~/.claude: $items — this workspace has no profile; keep global, set one up, or use local settings?" \
+           "[claude-profiles] New config was added to the user's GLOBAL ~/.claude: $items. This workspace has no claude-profiles profile. Ask the user whether to (a) keep it global, (b) set up/adopt a profile for this workspace with /claude-profiles:set and put it there, or (c) put it in local-only settings (.claude/settings.local.json)."
+  fi
 fi
 
-case "$action" in
-  commit)
-    append "Profile '$profile' has uncommitted changes — consider committing and pushing." \
-           "[claude-profiles] The profile branch '$profile' has uncommitted changes in .claude. Recommend the user commit and push so other workspaces on this profile pick them up."
-    ;;
-  push)
-    append "Profile '$profile' has unpushed commits — consider pushing them." \
-           "[claude-profiles] The profile branch '$profile' has commits that haven't been pushed. Recommend the user push them."
-    ;;
-esac
+# --- Profile sync nudge (only when a profile is active) ---------------------
+if [ "$has_profile" = 1 ]; then
+  status_kv=$(bash "$here/../scripts/profile-status.sh" "$workspace" 2>/dev/null || true)
+  case "$(kv_get "$status_kv" action)" in
+    commit)
+      append "Profile '$profile' has uncommitted changes — consider committing and pushing." \
+             "[claude-profiles] The profile branch '$profile' has uncommitted changes in .claude. Recommend the user commit and push so other workspaces on this profile pick them up."
+      ;;
+    push)
+      append "Profile '$profile' has unpushed commits — consider pushing them." \
+             "[claude-profiles] The profile branch '$profile' has commits that haven't been pushed. Recommend the user push them."
+      ;;
+  esac
+fi
 
 [ -n "$msg_parts" ] && hook_emit_json ConfigChange "$msg_parts" "$ctx_parts"
 exit 0

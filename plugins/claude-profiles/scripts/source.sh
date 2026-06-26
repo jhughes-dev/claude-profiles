@@ -31,6 +31,7 @@ case "$cmd" in
     repo="${2:?usage: source.sh add <name> <repo> [--default]}"
     makedef=""
     [ "${3:-}" = "--default" ] && makedef=default
+    pcfg_validate_repo "$repo" || exit 1
     if ! git ls-remote --heads "$repo" >/dev/null 2>&1; then
       echo "repo unreachable: $repo" >&2
       exit 1

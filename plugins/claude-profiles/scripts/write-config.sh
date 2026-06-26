@@ -8,5 +8,7 @@ here="$(dirname "$0")"
 . "$here/_lib.sh"
 
 repo="${1:?usage: write-config.sh <repo-url>}"
-pcfg_set_repo "$repo"
-echo "wrote repo=$repo to $(pcfg_file)"
+pcfg_set_repo "$repo" || exit 1
+# Redact any embedded credentials (scheme://user:pass@host) before echoing.
+redacted=$(printf '%s' "$repo" | sed -E 's#(://[^/:@]+):[^/@]*@#\1:***@#')
+echo "wrote repo=$redacted to $(pcfg_file)"

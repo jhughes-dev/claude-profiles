@@ -14,6 +14,12 @@ name="${2:?usage: promote-component.sh <type> <name> <copy|move> [workspace]}"
 mode="${3:?usage: promote-component.sh <type> <name> <copy|move> [workspace]}"
 workspace="${4:-${CLAUDE_PROJECT_DIR:-$PWD}}"
 
+# Reject anything that could escape the component directory: a name is a single
+# path segment, never a traversal. This guards the cp -R / rm -rf below.
+case "$name" in
+  */*|*\\*|.|..|"") echo "invalid component name: $name" >&2; exit 2 ;;
+esac
+
 user="$HOME/.claude"
 dest="$workspace/.claude"
 [ -d "$dest" ] || { echo "no profile .claude at $dest — run /claude-profiles:set first" >&2; exit 1; }

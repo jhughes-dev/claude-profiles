@@ -4,6 +4,18 @@
 # Print a hook JSON payload to stdout.
 # Usage: hook_emit_json <hook-event-name> <systemMessage> <additionalContext>
 # Uses jq when available; otherwise emits hand-escaped JSON.
+# Escape a string for embedding in a JSON double-quoted string, WITHOUT jq:
+# backslash and quote, the control chars JSON names (\n \t \r), and strip any
+# other control byte (which would otherwise produce invalid JSON).
+_json_escape_ctrl() {
+  awk 'BEGIN { RS = "\0" } {
+    gsub(/\\/, "\\\\"); gsub(/"/, "\\\"")
+    gsub(/\t/, "\\t");  gsub(/\r/, "\\r"); gsub(/\n/, "\\n")
+    gsub(/[\001-\010\013\014\016-\037]/, "")
+    printf "%s", $0
+  }'
+}
+
 hook_emit_json() {
   local event="$1" msg="$2" ctx="$3"
   if command -v jq >/dev/null 2>&1; then
@@ -11,11 +23,30 @@ hook_emit_json() {
       '{systemMessage: $msg, hookSpecificOutput: {hookEventName: $ev, additionalContext: $ctx}}'
   else
     local m c
-    m=$(printf '%s' "$msg" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')
-    c=$(printf '%s' "$ctx" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')
+    m=$(printf '%s' "$msg" | _json_escape_ctrl)
+    c=$(printf '%s' "$ctx" | _json_escape_ctrl)
     printf '{"systemMessage": "%s", "hookSpecificOutput": {"hookEventName": "%s", "additionalContext": "%s"}}\n' \
       "$m" "$event" "$c"
   fi
+}
+
+# Reject repo URLs that git would treat as a transport helper (ext::, fd::, …)
+# — those execute arbitrary commands — or that begin with '-' (parsed as a git
+# option). Normal URLs (https://, ssh://, git://, file://, scp-like
+# user@host:path) and local filesystem paths all pass. Returns non-zero with a
+# message on stderr when the URL is unsafe.
+pcfg_validate_repo() { # <repo>
+  local repo="$1"
+  case "$repo" in
+    "") echo "empty repo URL" >&2; return 1 ;;
+    -*) echo "refusing repo URL that begins with '-': $repo" >&2; return 1 ;;
+  esac
+  # "<helper>::<address>" transport-helper syntax (note the double colon).
+  if printf '%s' "$repo" | grep -Eq '^[A-Za-z][A-Za-z0-9+.-]*::'; then
+    echo "refusing transport-helper repo URL (possible code execution): $repo" >&2
+    return 1
+  fi
+  return 0
 }
 
 # Read a key from key=value lines on stdin.
@@ -302,6 +333,7 @@ pcfg_find_sources_for_branch() { # <branch>
 pcfg_add_source() { # <name> <repo> [default]
   pcfg_migrate
   local name="$1" repo="$2" makedef="${3:-}" dump
+  pcfg_validate_repo "$repo" || return 1
   dump=$(pcfg_dump)
   if printf '%s\n' "$dump" | awk -F'\t' -v n="$name" '$1 == "S" && $2 == n { f = 1 } END { exit !f }'; then
     dump=$(printf '%s\n' "$dump" | awk -F'\t' -v n="$name" -v r="$repo" 'BEGIN { OFS = "\t" } $1 == "S" && $2 == n { $3 = r } { print }')

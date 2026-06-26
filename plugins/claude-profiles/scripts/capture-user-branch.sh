@@ -105,4 +105,4 @@ if git -C "$dir" diff --cached --quiet 2>/dev/null; then
   exit 0
 fi
 git -C "$dir" commit -m "Capture ~/.claude as user profile"
-git -C "$dir" push -u origin "$branch"
+git -C "$dir" push -u origin -- "$branch"

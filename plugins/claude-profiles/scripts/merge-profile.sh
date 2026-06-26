@@ -41,17 +41,17 @@ IFS=',' read -r -a others <<< "$others_csv"
 
 for other in "${others[@]}"; do
   [ -n "$other" ] || continue
-  git -C "$dir" fetch origin "$other:refs/remotes/origin/$other" >/dev/null 2>&1 || {
+  git -C "$dir" fetch origin -- "$other:refs/remotes/origin/$other" >/dev/null 2>&1 || {
     echo "failed to fetch branch '$other' from $repo" >&2
     exit 1
   }
   if ! git -C "$dir" merge --no-ff "origin/$other" -m "Merge $other into $new_branch"; then
     # Conflict: surface the offending files and a checklist, then bail.
-    conflicts=$(git -C "$dir" diff --name-only --diff-filter=U)
     echo
     echo "Merge of '$other' into '$new_branch' has conflicts."
     echo "Conflicting files:"
-    printf '  %s\n' $conflicts
+    git -C "$dir" diff --name-only --diff-filter=U -z \
+      | while IFS= read -r -d '' f; do printf '  %s\n' "$f"; done
     echo
     echo "Resolution hints:"
     echo "  - settings.json, plugins/installed_plugins.json,"
@@ -70,7 +70,7 @@ for other in "${others[@]}"; do
   fi
 done
 
-git -C "$dir" push -u origin "$new_branch" || {
+git -C "$dir" push -u origin -- "$new_branch" || {
   echo "Merged cleanly but failed to push '$new_branch'." >&2
   echo "Push manually with: git -C .claude push -u origin $new_branch" >&2
   exit 1

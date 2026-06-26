@@ -30,7 +30,7 @@ git clone --branch "$branch" --single-branch "$repo" "$dir" || exit $?
 
 if [ -n "$new_branch" ]; then
   git -C "$dir" checkout -b "$new_branch" || exit $?
-  git -C "$dir" push -u origin "$new_branch" || {
+  git -C "$dir" push -u origin -- "$new_branch" || {
     echo "Created local branch '$new_branch' from '$branch' but failed to push." >&2
     echo "Push manually with: git -C .claude push -u origin $new_branch" >&2
     exit 1

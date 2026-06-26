@@ -13,6 +13,11 @@ workspace="${CLAUDE_PROJECT_DIR:-$PWD}"
 dir="$workspace/.claude"
 marker="$workspace/.claude-profiles"
 
+# Seed the global-config baseline so the ConfigChange hook can detect what gets
+# added to ~/.claude during this session (issue #9).
+bash "$here/../scripts/list-user-components.sh" 2>/dev/null | sort -u \
+  > "$HOME/.claude-profiles-global-cache" 2>/dev/null || true
+
 # Don't nag inside the global ~/.claude. Also skip a checkout of this plugin's
 # own source repo *only* when the user hasn't classified it yet — once they've
 # adopted it into a profile (marker present) we want normal sync reporting.

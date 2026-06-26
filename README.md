@@ -1,7 +1,13 @@
 # claude-profiles
 
-A Claude Code plugin for managing per-workspace `.claude` profiles backed by a
-git repo of profile branches.
+A Claude Code plugin for managing per-workflow `.claude` profiles backed by a
+git repo of profile branches. You define your own repo and profiles, then select
+from existing profiles or create new ones. This plugin handles config and
+management of the profile branches.
+
+Use this plugin in you frequently wear different hats (do a variety of different 
+workflows) and want to minimize context overhead between different projects without 
+needing to reconfigure each different set of addons. 
 
 Each workspace's `.claude/` is a clone of a *profiles repo* on a chosen branch.
 Different scenarios (rust-cli, web-dev, claude-addon-dev, etc.) live on
@@ -35,6 +41,9 @@ profile on your new profiles repo (without overwriting any live files). The
 user-profile branch name is your choice — `user` by default, or any name (e.g.
 `main`); it's recorded in the global config.
 
+It is recommended that you keep the claude-profiles plugin enabled in your "user"
+profile (i.e. in ~/.claude or wherever you configure your setup)
+
 ## Your profiles repo
 
 `/claude-profiles:init` sets up a separate git repo that you own — **any** git
@@ -43,9 +52,8 @@ on your machine. It just holds your profiles, one per branch:
 
 | Branch | Role |
 | --- | --- |
-| `main` | Landing branch seeded at `init` — holds a short README, not a profile. |
-| `template` | Starting content for new profile branches. `/claude-profiles:set --new` branches from here. |
 | `user` | Your personal `~/.claude` config, captured during `init`. The branch name is configurable (default `user`; can be any branch, e.g. `main`). |
+| `template` | Starting content for new profile branches. `/claude-profiles:set --new` branches from here. |
 | Scenario branches | One per development context (rust-cli, web-development, etc.). |
 
 ## Workspace commands
@@ -64,7 +72,7 @@ Once `/claude-profiles:init` is done, in any workspace:
 /claude-profiles:configure            # promote user-space config (plugins/skills/settings) into this profile
 /claude-profiles:describe "Rust CLI projects"   # set this profile's one-line description
 /claude-profiles:source list          # list profile sources
-/claude-profiles:source add work git@host:team/profiles.git   # draw profiles from another repo
+/claude-profiles:source add work git@host:team/profiles.git   # draw profiles from another repo called "work"
 ```
 
 The plugin's `SessionStart` hook reminds you to commit/push profile changes,

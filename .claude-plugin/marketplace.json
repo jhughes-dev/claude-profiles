@@ -10,7 +10,7 @@
       "name": "claude-profiles",
       "source": "./plugins/claude-profiles",
       "description": "Manage per-workspace .claude profiles backed by a git repo of profile branches.",
-      "version": "1.3.0"
+      "version": "1.3.1"
     }
   ]
 }

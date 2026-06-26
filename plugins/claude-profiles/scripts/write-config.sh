@@ -9,6 +9,4 @@ here="$(dirname "$0")"
 
 repo="${1:?usage: write-config.sh <repo-url>}"
 pcfg_set_repo "$repo" || exit 1
-# Redact any embedded credentials (scheme://user:pass@host) before echoing.
-redacted=$(printf '%s' "$repo" | sed -E 's#(://[^/:@]+):[^/@]*@#\1:***@#')
-echo "wrote repo=$redacted to $(pcfg_file)"
+echo "wrote repo=$(pcfg_redact_repo "$repo") to $(pcfg_file)"

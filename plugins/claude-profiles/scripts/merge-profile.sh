@@ -26,6 +26,7 @@ if [ -z "$repo" ]; then
   echo "no profiles repo configured — run /claude-profiles:init" >&2
   exit 1
 fi
+pcfg_validate_repo "$repo" || { echo "refusing unsafe configured repo URL" >&2; exit 1; }
 
 if [ -e "$dir" ]; then
   echo ".claude already exists at $dir — remove it first" >&2

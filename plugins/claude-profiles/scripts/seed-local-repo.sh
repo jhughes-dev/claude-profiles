@@ -33,19 +33,21 @@ trap 'rm -rf "$tmp"' EXIT
 seed_branch() { # <branch> <content-dir>
   local branch="$1" src="$2"
   local work="$tmp/$branch"
-  git init -q -b "$branch" "$work"
-  cp -R "$src/." "$work/"
+  git init -q -b "$branch" "$work" || return 1
+  cp -R "$src/." "$work/" || return 1
   (
-    cd "$work"
+    cd "$work" || exit 1
     git config user.email "claude-profiles@localhost"
     git config user.name "claude-profiles"
-    git add -A
-    git commit -q -m "Seed $branch from bundled starter"
+    git add -A &&
+    git commit -q -m "Seed $branch from bundled starter" &&
     git push -q "$path" "$branch:$branch"
   )
 }
 
-seed_branch main "$starter/main"
-seed_branch template "$starter/template"
+seed_branch main "$starter/main" \
+  || { echo "failed to seed 'main' into $path (does it already have that branch?)" >&2; exit 1; }
+seed_branch template "$starter/template" \
+  || { echo "failed to seed 'template' into $path (does it already have that branch?)" >&2; exit 1; }
 
 echo "seeded $path with: main, template (from bundled starter)"

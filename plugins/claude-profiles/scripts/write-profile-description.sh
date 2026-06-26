@@ -18,6 +18,9 @@ dir="$workspace/.claude"
 branch="${3:-$(git -C "$dir" branch --show-current 2>/dev/null)}"
 source="${4:-$(pcfg_active_source)}"
 
-printf '%s\n' "$text" > "$dir/.profile-description"
-[ -n "$branch" ] && pcfg_set_description "$branch" "$text" "$source"
+# A description is a one-liner. The config dump is TAB/line-delimited, so collapse
+# any TAB/CR/LF to spaces (and trim) before storing — otherwise they corrupt it.
+clean=$(printf '%s' "$text" | tr '\t\r\n' '   ' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+printf '%s\n' "$clean" > "$dir/.profile-description"
+[ -n "$branch" ] && pcfg_set_description "$branch" "$clean" "$source"
 echo "wrote $dir/.profile-description"

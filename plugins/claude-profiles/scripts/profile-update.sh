@@ -19,6 +19,10 @@
 # Exits 0 on success, 1 on hard error (e.g. no .claude).
 set -uo pipefail
 
+here="$(dirname "$0")"
+# shellcheck source=_lib.sh
+. "$here/_lib.sh"
+
 workspace="${1:-${CLAUDE_PROJECT_DIR:-$PWD}}"
 dir="$workspace/.claude"
 
@@ -34,6 +38,17 @@ if [ ! -d "$dir/.git" ]; then
   emit state not_git
   emit action opt_out_cleanup
   emit summary "Workspace opted out — no profile to update."
+  exit 1
+fi
+
+# Refuse to touch the remote if the clone's origin URL is unsafe (a
+# transport-helper URL would execute commands on fetch/pull/push).
+origin=$(git -C "$dir" remote get-url origin 2>/dev/null || true)
+if [ -n "$origin" ] && ! pcfg_validate_repo "$origin" >/dev/null 2>&1; then
+  emit state ok
+  emit branch "$(git -C "$dir" branch --show-current 2>/dev/null)"
+  emit action push_failed
+  emit summary "Refusing to sync: the profile's git origin URL looks unsafe. Fix .claude's remote."
   exit 1
 fi
 

@@ -29,11 +29,12 @@ if [ -z "$repo" ]; then
   emit summary "$file has no profiles source configured."
   exit 0
 fi
-emit repo "$repo"
-if git ls-remote --heads "$repo" >/dev/null 2>&1; then
+safe_repo=$(pcfg_redact_repo "$repo")
+emit repo "$safe_repo"
+if pcfg_validate_repo "$repo" >/dev/null 2>&1 && git ls-remote --heads "$repo" >/dev/null 2>&1; then
   emit state ok
-  emit summary "Profiles repo configured and reachable: $repo"
+  emit summary "Profiles repo configured and reachable: $safe_repo"
 else
   emit state unreachable
-  emit summary "Configured repo is unreachable: $repo"
+  emit summary "Configured repo is unreachable: $safe_repo"
 fi

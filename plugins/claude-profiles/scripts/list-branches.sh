@@ -17,6 +17,7 @@ here="$(dirname "$0")"
 _branches_of() { # <source>
   local r; r=$(pcfg_source_repo "$1")
   [ -n "$r" ] || return 0
+  pcfg_validate_repo "$r" >/dev/null 2>&1 || return 0
   git ls-remote --heads "$r" 2>/dev/null \
     | awk '{ sub("refs/heads/", "", $2); print $2 }' \
     | grep -v '^template$'

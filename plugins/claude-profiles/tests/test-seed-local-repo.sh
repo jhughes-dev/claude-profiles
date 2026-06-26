@@ -40,3 +40,9 @@ assert_eq "$got" "custom-template" "custom template content seeded" || exit 1
 if run_script seed-local-repo.sh "$TEST_TMP/target3.git" "$TEST_TMP/nope" >/dev/null 2>&1; then
   echo "expected non-zero when starter dir missing" >&2; exit 1
 fi
+
+# 4) Re-seeding an already-seeded repo must FAIL loudly (non-fast-forward push),
+#    not silently report success.
+if run_script seed-local-repo.sh "$target" >/dev/null 2>&1; then
+  echo "re-seeding an existing repo should fail, not report success" >&2; exit 1
+fi

@@ -25,6 +25,7 @@ if [ -z "$repo" ]; then
   echo "no profiles repo configured — run /claude-profiles:init first" >&2
   exit 1
 fi
+pcfg_validate_repo "$repo" || { echo "refusing unsafe configured repo URL" >&2; exit 1; }
 [ -d "$dir" ] || { echo "$dir does not exist" >&2; exit 1; }
 
 # Resolve the user-profile branch: explicit arg (persisted) > stored pref > 'user'.
@@ -104,5 +105,5 @@ if git -C "$dir" diff --cached --quiet 2>/dev/null; then
   echo "nothing to commit (already in sync with origin/$branch)"
   exit 0
 fi
-git -C "$dir" commit -m "Capture ~/.claude as user profile"
+git -C "$dir" commit -m "Capture ~/.claude as user profile" || exit $?
 git -C "$dir" push -u origin -- "$branch"

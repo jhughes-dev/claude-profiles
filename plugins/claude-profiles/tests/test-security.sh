@@ -58,3 +58,18 @@ out=$(run_script write-config.sh "https://alice:s3cret@host/o/r.git" 2>&1)
 assert_eq "$?" "0" "credentialed https URL is accepted" || { echo "$out"; exit 1; }
 assert_contains "$out" "***" "password is redacted in output" || { echo "$out"; exit 1; }
 case "$out" in *s3cret*) echo "password leaked in output: $out" >&2; exit 1 ;; esac
+
+# pcfg_redact_repo covers user:pass@ AND the bare-token@ form; scp-like/local untouched.
+assert_eq "$(pcfg_redact_repo 'https://u:p@host/r.git')" "https://***@host/r.git" "redact user:pass" || exit 1
+assert_eq "$(pcfg_redact_repo 'https://ghp_T0KEN@github.com/o/r.git')" "https://***@github.com/o/r.git" "redact bare token" || exit 1
+assert_eq "$(pcfg_redact_repo 'git@github.com:o/r.git')" "git@github.com:o/r.git" "scp-like unchanged" || exit 1
+
+# source.sh list redacts the credentialed default source stored just above.
+out=$(run_script source.sh list 2>&1)
+assert_contains "$out" "***" "source list redacts credentials" || { echo "$out"; exit 1; }
+case "$out" in *s3cret*) echo "source list leaked password: $out" >&2; exit 1 ;; esac
+
+# source.sh add rejects an invalid source name (TAB/space/control chars).
+if run_script source.sh add "bad name" "https://example.com/x.git" >/dev/null 2>&1; then
+  echo "source add accepted an invalid source name" >&2; exit 1
+fi

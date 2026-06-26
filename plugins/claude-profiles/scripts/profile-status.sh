@@ -14,6 +14,10 @@
 # Always exits 0 on success — consumers should switch on `state`/`action`.
 set -uo pipefail
 
+here="$(dirname "$0")"
+# shellcheck source=_lib.sh
+. "$here/_lib.sh"
+
 workspace="${1:-${CLAUDE_PROJECT_DIR:-$PWD}}"
 dir="$workspace/.claude"
 
@@ -33,9 +37,18 @@ if [ ! -d "$dir/.git" ]; then
   exit 0
 fi
 
-# Refresh remote tracking; reset the session-start hook's daily fetch cache too.
-git -C "$dir" fetch -q 2>/dev/null || true
-touch "$dir/.git/profile-fetch-stamp" 2>/dev/null || true
+# Refresh remote tracking. Hot-path callers (the SessionStart/ConfigChange
+# hooks) set CLAUDE_PROFILES_FETCH=daily to rate-limit this network call to once
+# per day via the stamp; interactive callers (status/update) leave it unset for
+# an immediate fetch. Skip if the clone's origin URL is unsafe (RCE guard).
+stamp="$dir/.git/profile-fetch-stamp"
+origin=$(git -C "$dir" remote get-url origin 2>/dev/null || true)
+if [ -n "$origin" ] && pcfg_validate_repo "$origin" >/dev/null 2>&1; then
+  if [ "${CLAUDE_PROFILES_FETCH:-}" != "daily" ] || [ -z "$(find "$stamp" -mtime -1 2>/dev/null)" ]; then
+    git -C "$dir" fetch -q 2>/dev/null || true
+    touch "$stamp" 2>/dev/null || true
+  fi
+fi
 
 branch=$(git -C "$dir" branch --show-current 2>/dev/null)
 dirty=0

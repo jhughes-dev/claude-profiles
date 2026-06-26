@@ -27,7 +27,7 @@ has package.json && emit node
 
 # App shells / domains
 { has src-tauri || has src-tauri/tauri.conf.json; } && emit tauri
-{ has fabric.mod.json || has build.gradle && grep -rqi 'minecraft\|fabric\|forge' "$ws"/*.gradle* 2>/dev/null; } && emit minecraft
+{ has fabric.mod.json || { has build.gradle && grep -rqi 'minecraft\|fabric\|forge' "$ws"/*.gradle* 2>/dev/null; }; } && emit minecraft
 { has .claude-plugin || has .claude-plugin/plugin.json || has plugin.json; } && emit claude-plugin
 has Dockerfile && emit docker
 

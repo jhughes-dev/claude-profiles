@@ -1,6 +1,6 @@
 ---
 name: set
-description: Configure the Claude profile (.claude folder) for this workspace
+description: Pick, create, switch, adopt, or opt out of this workspace's .claude profile branch
 argument-hint: "[branch | --new <branch> [--from <a>,<b>,...] | --adopt <branch> | --none]"
 disable-model-invocation: true
 ---
@@ -100,8 +100,15 @@ Exit codes:
   to step 4.
 - **2** — conflicts. The script printed the conflicting files and a resolution
   checklist; do **not** proceed past step 3. Tell the user to resolve in
-  `.claude/`, then commit and push manually. Skip steps 4 and 5 — the user
-  will re-run `/claude-profiles:set <branch>` after pushing.
+  `.claude/`, then commit and push manually. The `.claude` clone is already on
+  `<branch>`, so do **not** tell them to re-run `/claude-profiles:set <branch>`
+  (a bare branch name re-enters the clone path, which refuses because `.claude`
+  exists). Once they've pushed, finish setup in place by doing steps 4–5
+  directly: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/ensure-gitignore.sh"`, then
+  `bash "${CLAUDE_PLUGIN_ROOT}/scripts/write-marker.sh" <branch>`, then
+  `bash "${CLAUDE_PLUGIN_ROOT}/scripts/refresh-branches-cache.sh"`. (Equivalently,
+  re-run `/claude-profiles:set` with **no argument** — step 2 detects the existing
+  clone and just writes the marker.)
 - **other** — hard failure (clone/fetch/push). Surface the script's stderr.
 
 ### 3c. Adopt existing `.claude`

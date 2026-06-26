@@ -42,7 +42,8 @@ Heuristics when the user gives no signal:
 **Do not move a plugin's files into a profile branch.** Plugins are installed
 once into the user's plugin directory (`~/.claude/plugins/...`) and then
 *enabled* per profile by listing them in that profile's `settings.json`
-(`enabledPlugins` / `enabledPluginMarketplaces`).
+(`enabledPlugins`, with the providing marketplace registered under
+`extraKnownMarketplaces`).
 
 Why this matters:
 
@@ -59,8 +60,8 @@ When the user says "add plugin X to this profile":
 1. Confirm the plugin is installed in user space (`/plugin list` or check
    `~/.claude/plugins/`). If not, install it there first with `/plugin install`.
 2. Edit the **profile's** `.claude/settings.json` to add the plugin to
-   `enabledPlugins` (and its marketplace to `enabledPluginMarketplaces` if
-   needed).
+   `enabledPlugins` (and, if its marketplace isn't already known, copy that
+   marketplace's definition into `extraKnownMarketplaces`).
 3. Commit the settings change to the profile branch.
 
 If you find plugin source files that have been copied into a profile branch,

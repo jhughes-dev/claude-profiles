@@ -43,7 +43,8 @@ on your machine. It just holds your profiles, one per branch:
 
 | Branch | Role |
 | --- | --- |
-| `template` | Starting content for new profile branches. `/claude-profiles:set --new` clones from here. |
+| `main` | Landing branch seeded at `init` — holds a short README, not a profile. |
+| `template` | Starting content for new profile branches. `/claude-profiles:set --new` branches from here. |
 | `user` | Your personal `~/.claude` config, captured during `init`. The branch name is configurable (default `user`; can be any branch, e.g. `main`). |
 | Scenario branches | One per development context (rust-cli, web-development, etc.). |
 
@@ -56,6 +57,7 @@ Once `/claude-profiles:init` is done, in any workspace:
 /claude-profiles:set rust-cli         # clone a specific profile
 /claude-profiles:set --new my-thing   # new branch from template, configure then push
 /claude-profiles:set --new combo --from rust-cli,addons-dev   # merge two profiles into a new branch
+/claude-profiles:set --adopt my-thing # adopt this workspace's existing .claude as a new profile branch
 /claude-profiles:set --none           # mark workspace as no-profile
 /claude-profiles:status               # show sync status of this workspace's profile
 /claude-profiles:update               # pull + push this workspace's profile (resolve conflicts)

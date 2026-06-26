@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Shared helpers for claude-profiles hooks. `source` this file; do not run it.
 
+# True when jq should be used. Honors CLAUDE_PROFILES_NO_JQ=1 so tests (and users
+# who want to exercise the pure-bash path) can force the no-jq code path.
+_have_jq() { [ -z "${CLAUDE_PROFILES_NO_JQ:-}" ] && command -v jq >/dev/null 2>&1; }
+
 # Print a hook JSON payload to stdout.
 # Usage: hook_emit_json <hook-event-name> <systemMessage> <additionalContext>
 # Uses jq when available; otherwise emits hand-escaped JSON.
@@ -8,17 +12,22 @@
 # backslash and quote, the control chars JSON names (\n \t \r), and strip any
 # other control byte (which would otherwise produce invalid JSON).
 _json_escape_ctrl() {
-  awk 'BEGIN { RS = "\0" } {
-    gsub(/\\/, "\\\\"); gsub(/"/, "\\\"")
-    gsub(/\t/, "\\t");  gsub(/\r/, "\\r"); gsub(/\n/, "\\n")
-    gsub(/[\001-\010\013\014\016-\037]/, "")
-    printf "%s", $0
-  }'
+  # Process line by line and rejoin with an escaped \n, so it works the same on
+  # gawk, mawk, and BSD/macOS awk (no reliance on RS="\0" slurping).
+  awk '
+    {
+      gsub(/\\/, "\\\\"); gsub(/"/, "\\\"")
+      gsub(/\t/, "\\t");  gsub(/\r/, "\\r")
+      gsub(/[\001-\010\013\014\016-\037]/, "")
+      if (NR > 1) printf "\\n"
+      printf "%s", $0
+    }
+  '
 }
 
 hook_emit_json() {
   local event="$1" msg="$2" ctx="$3"
-  if command -v jq >/dev/null 2>&1; then
+  if _have_jq; then
     jq -nc --arg ev "$event" --arg msg "$msg" --arg ctx "$ctx" \
       '{systemMessage: $msg, hookSpecificOutput: {hookEventName: $ev, additionalContext: $ctx}}'
   else
@@ -47,6 +56,13 @@ pcfg_validate_repo() { # <repo>
     return 1
   fi
   return 0
+}
+
+# Redact any credentials embedded in a repo URL's userinfo before display.
+# Covers both `user:pass@host` and the bare-token form `token@host`; scp-like
+# (`git@host:path`) and local paths have no `://` userinfo and pass through.
+pcfg_redact_repo() { # <repo>
+  printf '%s' "$1" | sed -E 's#://[^/@]*@#://***@#'
 }
 
 # Read a key from key=value lines on stdin.
@@ -132,7 +148,7 @@ _json_scan() { # <file> <key>
 json_get_string() {
   local file="$1" key="$2"
   [ -f "$file" ] || return 0
-  if command -v jq >/dev/null 2>&1; then
+  if _have_jq; then
     jq -r --arg k "$key" '.[$k] // empty' "$file" 2>/dev/null
   else
     _json_scan "$file" "$key"
@@ -172,7 +188,7 @@ PCFG_PREF_KEYS="promoteMode userBranch"
 pcfg_dump() {
   local file; file="$(pcfg_file)"
   [ -f "$file" ] || return 0
-  if command -v jq >/dev/null 2>&1; then
+  if _have_jq; then
     jq -r '
       ( (.preferences // {}) | to_entries[] | "K\t" + .key + "\t" + (.value | tostring) ),
       ( .sources[]? |
@@ -291,8 +307,14 @@ pcfg_migrate() {
   local repo branches
   repo=$(sed -n 's/^repo=//p' "$old" | head -n1)
   branches=$(sed -n 's/^branches=//p' "$old" | head -n1)
+  # Never persist an unsafe (transport-helper) repo from a hand-edited/legacy
+  # file — a later git call would execute it. Drop it instead.
+  if [ -n "$repo" ] && ! pcfg_validate_repo "$repo" >/dev/null 2>&1; then
+    echo "claude-profiles: dropping unsafe repo URL from legacy config: $repo" >&2
+    repo=""
+  fi
   {
-    printf 'S\tdefault\t%s\ttrue\n' "$repo"
+    [ -n "$repo" ] && printf 'S\tdefault\t%s\ttrue\n' "$repo"
     ( IFS=,; for b in $branches; do [ -n "$b" ] && printf 'P\tdefault\t%s\t\n' "$b"; done )
   } | _pcfg_write_from_dump
   mv "$old" "$old.migrated-to-json" 2>/dev/null || true

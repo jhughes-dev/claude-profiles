@@ -23,22 +23,26 @@ case "$cmd" in
     printf '%s\n' "$sources" | while IFS= read -r n; do
       [ -n "$n" ] || continue
       mark=" "; [ "$n" = "$def" ] && mark="*"
-      printf '%s %s\t%s\n' "$mark" "$n" "$(pcfg_source_repo "$n")"
+      printf '%s %s\t%s\n' "$mark" "$n" "$(pcfg_redact_repo "$(pcfg_source_repo "$n")")"
     done
     ;;
   add)
     name="${1:?usage: source.sh add <name> <repo> [--default]}"
     repo="${2:?usage: source.sh add <name> <repo> [--default]}"
+    case "$name" in
+      *[!A-Za-z0-9._-]*|"") echo "invalid source name: $name (use letters, digits, . _ -)" >&2; exit 2 ;;
+    esac
     makedef=""
     [ "${3:-}" = "--default" ] && makedef=default
     pcfg_validate_repo "$repo" || exit 1
+    safe_repo=$(pcfg_redact_repo "$repo")
     if ! git ls-remote --heads "$repo" >/dev/null 2>&1; then
-      echo "repo unreachable: $repo" >&2
+      echo "repo unreachable: $safe_repo" >&2
       exit 1
     fi
     pcfg_add_source "$name" "$repo" "$makedef"
     bash "$here/refresh-branches-cache.sh" "$name" >/dev/null 2>&1 || true
-    echo "added source '$name' -> $repo${makedef:+ (default)}"
+    echo "added source '$name' -> $safe_repo${makedef:+ (default)}"
     ;;
   remove|rm)
     name="${1:?usage: source.sh remove <name>}"

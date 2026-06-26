@@ -46,7 +46,7 @@ append() {
 }
 
 if [ -n "$added_list" ]; then
-  items=$(printf '%s' "$added_list" | paste -sd'; ' -)
+  items=$(printf '%s' "$added_list" | paste -sd';' - | sed 's/;/; /g')
   if [ "$has_profile" = 1 ]; then
     append "Added to your global ~/.claude: $items — keep global, move into profile '$profile', or local settings?" \
            "[claude-profiles] New config was added to the user's GLOBAL ~/.claude: $items. Ask the user, per item, whether it should (a) move into this workspace's profile '$profile' — for a plugin that means enabling it in .claude/settings.json's enabledPlugins; for a skill/agent/command/hook, copying it into .claude/<type>/ (the /claude-profiles:configure skill does this) — (b) go into local-only settings (.claude/settings.local.json), or (c) stay global on purpose. Apply the choice and, for profile changes, offer to commit + push."
@@ -58,7 +58,7 @@ fi
 
 # --- Profile sync nudge (only when a profile is active) ---------------------
 if [ "$has_profile" = 1 ]; then
-  status_kv=$(bash "$here/../scripts/profile-status.sh" "$workspace" 2>/dev/null || true)
+  status_kv=$(CLAUDE_PROFILES_FETCH=daily bash "$here/../scripts/profile-status.sh" "$workspace" 2>/dev/null || true)
   case "$(kv_get "$status_kv" action)" in
     commit)
       append "Profile '$profile' has uncommitted changes — consider committing and pushing." \

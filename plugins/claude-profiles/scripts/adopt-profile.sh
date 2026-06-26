@@ -25,6 +25,7 @@ if [ -z "$repo" ]; then
   echo "no profiles repo configured — run /claude-profiles:init" >&2
   exit 1
 fi
+pcfg_validate_repo "$repo" || { echo "refusing unsafe configured repo URL" >&2; exit 1; }
 if [ ! -d "$dir" ]; then
   echo "no .claude folder at $dir — nothing to adopt" >&2
   exit 1
@@ -45,15 +46,16 @@ if [ -d "$dir/.git" ]; then
   if [ -n "$current_branch" ] && [ "$current_branch" != "$branch" ]; then
     git -C "$dir" branch -M "$branch"
   fi
-  git -C "$dir" push -u origin -- "$branch"
+  git -C "$dir" push -u origin -- "$branch" || exit $?
   bash "$here/cache-description.sh" "$branch" "$workspace" >/dev/null 2>&1 || true
   exit 0
 fi
 
-# Fresh: init + first commit + push.
-git -C "$dir" init -b "$branch"
-git -C "$dir" remote add origin "$repo"
-git -C "$dir" add -A
-git -C "$dir" commit -m "Adopt existing .claude as profile '$branch'"
-git -C "$dir" push -u origin -- "$branch"
+# Fresh: init + first commit + push. Guard each mutation so a failure (e.g. no
+# git user.name/email configured) surfaces instead of being masked.
+git -C "$dir" init -b "$branch" || exit $?
+git -C "$dir" remote add origin "$repo" || exit $?
+git -C "$dir" add -A || exit $?
+git -C "$dir" commit -m "Adopt existing .claude as profile '$branch'" || exit $?
+git -C "$dir" push -u origin -- "$branch" || exit $?
 bash "$here/cache-description.sh" "$branch" "$workspace" >/dev/null 2>&1 || true

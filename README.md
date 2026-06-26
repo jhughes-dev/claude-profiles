@@ -5,7 +5,7 @@ git repo of profile branches. You define your own repo and profiles, then select
 from existing profiles or create new ones. This plugin handles config and
 management of the profile branches.
 
-Use this plugin in you frequently wear different hats (do a variety of different 
+Use this plugin if you frequently wear different hats (do a variety of different 
 workflows) and want to minimize context overhead between different projects without 
 needing to reconfigure each different set of addons. 
 

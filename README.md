@@ -55,6 +55,7 @@ Once `/claude-profiles:init` is done, in any workspace:
 /claude-profiles:status               # show sync status of this workspace's profile
 /claude-profiles:update               # pull + push this workspace's profile (resolve conflicts)
 /claude-profiles:configure            # promote user-space config (plugins/skills/settings) into this profile
+/claude-profiles:describe "Rust CLI projects"   # set this profile's one-line description
 /claude-profiles:source list          # list profile sources
 /claude-profiles:source add work git@host:team/profiles.git   # draw profiles from another repo
 ```
@@ -69,6 +70,14 @@ team repo. Manage them with `/claude-profiles:source` (`add`/`remove`/`list`/`de
 `/claude-profiles:set <branch>` finds which source provides a branch and asks
 when several share the same name; the chosen source is recorded in the
 workspace marker's `source` field so future syncs pull from the right repo.
+
+## Profile descriptions
+
+A profile can describe itself with a one-line `.profile-description` file at its
+root (`.claude/.profile-description`). Set it with `/claude-profiles:describe`,
+or commit the file directly. Descriptions are cached in the config as profiles
+are cloned/adopted and shown when picking a profile (`/claude-profiles:set`,
+`list-branches --by-source`), so it's easy to recognize what each branch is for.
 
 A `.claude-profiles` marker (JSON) at the workspace root records the chosen
 profile — `{ "version": 1, "profile": "<branch>", "source": "<name>", "repo":

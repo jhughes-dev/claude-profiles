@@ -37,3 +37,9 @@ if [ -n "$new_branch" ]; then
   }
   echo "Created and pushed branch '$new_branch' from '$branch'."
 fi
+
+# Opportunistically cache this profile's self-description (issue #3).
+# Only for a direct clone — a new-from-template branch has no description yet.
+if [ -z "$new_branch" ]; then
+  bash "$here/cache-description.sh" "$branch" "$workspace" >/dev/null 2>&1 || true
+fi

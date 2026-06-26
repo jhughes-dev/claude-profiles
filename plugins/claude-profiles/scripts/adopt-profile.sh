@@ -46,6 +46,7 @@ if [ -d "$dir/.git" ]; then
     git -C "$dir" branch -M "$branch"
   fi
   git -C "$dir" push -u origin "$branch"
+  bash "$here/cache-description.sh" "$branch" "$workspace" >/dev/null 2>&1 || true
   exit 0
 fi
 
@@ -55,3 +56,4 @@ git -C "$dir" remote add origin "$repo"
 git -C "$dir" add -A
 git -C "$dir" commit -m "Adopt existing .claude as profile '$branch'"
 git -C "$dir" push -u origin "$branch"
+bash "$here/cache-description.sh" "$branch" "$workspace" >/dev/null 2>&1 || true

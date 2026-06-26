@@ -16,7 +16,7 @@ URLs around explicitly.
 **Source resolution.** When the user names an existing branch, find which
 source provides it by running
 `bash "${CLAUDE_PLUGIN_ROOT}/scripts/list-branches.sh" --by-source` (it prints
-`<source>\t<branch>` lines):
+`<source>\t<branch>\t<description>` lines):
 
 - Exactly one source has the branch → use it.
 - Several sources have a branch of that name → **ask the user which source**.
@@ -53,7 +53,9 @@ folder (if any) and continue. The marker will be rewritten in step 5.
   - **No `.claude`** → offer existing / new-from-template / opt-out.
 
   To list available branches, run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/list-branches.sh"`
-  (or `--by-source` to see which source each branch comes from).
+  (or `--by-source` to see each branch's source and cached description). Show the
+  descriptions to help the user choose; a profile's description is filled in once
+  it's been cloned/adopted (or set via `/claude-profiles:describe`).
 
 ## 3. Execute the chosen mode
 

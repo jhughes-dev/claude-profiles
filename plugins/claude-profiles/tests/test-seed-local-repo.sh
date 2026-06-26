@@ -41,8 +41,15 @@ if run_script seed-local-repo.sh "$TEST_TMP/target3.git" "$TEST_TMP/nope" >/dev/
   echo "expected non-zero when starter dir missing" >&2; exit 1
 fi
 
-# 4) Re-seeding an already-seeded repo must FAIL loudly (non-fast-forward push),
-#    not silently report success.
-if run_script seed-local-repo.sh "$target" >/dev/null 2>&1; then
-  echo "re-seeding an existing repo should fail, not report success" >&2; exit 1
+# 4) When a push genuinely fails, the script must report failure rather than
+#    silently exit 0. Force a non-fast-forward by giving the target a diverging
+#    `main` first (deterministic — no reliance on commit-timestamp differences).
+busy="$TEST_TMP/busy.git"
+git init -q --bare -b main "$busy"
+seedwc="$TEST_TMP/seedwc"
+git init -q -b main "$seedwc"
+( cd "$seedwc" && git config user.email t@t && git config user.name t \
+  && echo diverging > x && git add x && git commit -q -m other && git push -q "$busy" main )
+if run_script seed-local-repo.sh "$busy" >/dev/null 2>&1; then
+  echo "seeding over a diverging branch should fail, not report success" >&2; exit 1
 fi

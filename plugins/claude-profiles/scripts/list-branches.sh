@@ -4,7 +4,7 @@
 # Usage:
 #   list-branches.sh               names only, all sources, deduped + sorted
 #   list-branches.sh <source>      names only, just that source
-#   list-branches.sh --by-source   "<source>\t<branch>" lines, all sources
+#   list-branches.sh --by-source   "<source>\t<branch>\t<description>" lines
 #
 # Exits non-zero if no profiles repo is configured.
 set -uo pipefail
@@ -27,7 +27,9 @@ case "$mode" in
   --by-source)
     [ -n "$(pcfg_sources)" ] || { echo "no profiles repo configured — run /claude-profiles:init" >&2; exit 1; }
     pcfg_sources | while IFS= read -r s; do
-      _branches_of "$s" | sort | while IFS= read -r b; do printf '%s\t%s\n' "$s" "$b"; done
+      _branches_of "$s" | sort | while IFS= read -r b; do
+        printf '%s\t%s\t%s\n' "$s" "$b" "$(pcfg_description "$b" "$s")"
+      done
     done
     ;;
   "")
